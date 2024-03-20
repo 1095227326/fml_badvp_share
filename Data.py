@@ -273,9 +273,9 @@ def get_full_data(dataset_name):
             transforms.ToTensor(),
         ])
         food_dataset_train = datasets.Food101(
-            root='./data', split='train', download=True, transform=transform)
+            root='./data/food101', split='train', download=True, transform=transform)
         food_dataset_test = datasets.Food101(
-            root='./data', split='test', download=True, transform=transform)
+            root='./data/food101', split='test', download=True, transform=transform)
         class_names = food_dataset_train.classes
         
         def load_and_transform_image(image_path):
