@@ -37,6 +37,8 @@ def parse_option():
                         help='gpu')
     parser.add_argument('--tqdm', default=True,
                     help='whether the tqdm is displayed')
+    parser.add_argument('--isfml', default=True,
+                    help='whether the tqdm is displayed')
 
 
     # optimization
@@ -131,13 +133,13 @@ def parse_option():
                         action="store_true",
                         help='evaluate model test set')
 
-    
-
-
     args = parser.parse_args()
     args.gpu = int(args.device[-1])
     
     t_path = './save/{}_{}_{}_{}_{}_{}'.format(args.dataset,args.model,args.mode,args.merge_mode,args.poison_ratio,args.poison_client_num)
+    if args.isfml :
+        args.merge_mode = 'avg'
+        t_path = '{}_notfml'.format(t_path)
     print('Save_Path Is {}'.format(t_path))
    
     if os.path.exists(t_path)  :
