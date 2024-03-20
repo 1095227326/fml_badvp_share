@@ -6,4 +6,5 @@ save
 vit-base-patch16-224
 *.out
 *.txt
+cmd
 README.md

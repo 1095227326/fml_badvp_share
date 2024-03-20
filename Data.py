@@ -283,7 +283,7 @@ def get_full_data(dataset_name):
 
         def get_mate(loader):
             t_data_list,t_target_list = [],[]
-            for imgs,targets in tqdm(loader,disable=True):
+            for imgs,targets in tqdm(loader,disable = True):
                 imgs = imgs.permute(0,2,3,1)
                 imgs = imgs.numpy()
                 imgs = (imgs * 255).astype(np.uint8)
