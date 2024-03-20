@@ -129,6 +129,7 @@ def main(args):
             print(desc.format(node_id, now_epoch+1, loss))
 
             if (now_epoch+1) % args.val_freq == 0 or now_epoch+1 == args.epochs:
+                # acc,asr = -100,-100
                 acc = validate(indices, test_clean_loader, model,
                                now_node.prompter, now_node.criterion, now_node.args)
                 asr = validate(indices, test_backdoor_loader, model,
