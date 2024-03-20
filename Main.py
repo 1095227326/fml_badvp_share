@@ -165,7 +165,7 @@ def main(args):
                     desc = 'Round {}/{} Node_{} Clean  Epoch {} Loss is {:4.5f}'
                 print(desc.format(i+1, args.round, node_id, now_epoch + 1, loss))
 
-
+            # acc,asr = -10,-10
             acc = validate(indices, test_clean_loader, model,
                            now_node.prompter, now_node.criterion, now_node.args)
             asr = validate(indices, test_backdoor_loader, model,
