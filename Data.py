@@ -273,28 +273,30 @@ def get_full_data(dataset_name):
             transforms.ToTensor(),
         ])
         food_dataset_train = datasets.Food101(
-            root='./data', split='train', download=True, transform=transform)
+            root='./data/food101', split='train', download=True, transform=transform)
         food_dataset_test = datasets.Food101(
-            root='./data', split='test', download=True, transform=transform)
+            root='./data/food101', split='test', download=True, transform=transform)
         class_names = food_dataset_train.classes
         
-        def load_and_transform_image(image_path):
-            # 加载图像并转换为RGB
-            img = Image.open(image_path).convert("RGB")
-            # 应用转换
-            img = transform(img)
-            # 将图像数据转换为NumPy数组，乘以255，并转换为uint8
-            img = (img.numpy() * 255).astype(np.uint8)
-            # 转换数组的形状为(高度, 宽度, 通道数)
-            img = img.transpose((1, 2, 0))
-            return img
+        t_train_loader = DataLoader(food_dataset_train,batch_size = 100,num_workers = 16)
+        t_test_loader = DataLoader(food_dataset_test,batch_size = 100,num_workers = 16)
+
+        def get_mate(loader):
+            t_data_list,t_target_list = [],[]
+            for imgs,targets in tqdm(loader):
+                imgs = imgs.permute(0,2,3,1)
+                imgs = imgs.numpy()
+                imgs = (imgs * 255).astype(np.uint8)
+                targets = targets.numpy()
+                t_data_list.extend ( [imgs[i] for i in range(imgs.shape[0])] )
+                t_target_list.extend([targets[i] for i in range(targets.shape[0])])
+
+            return t_data_list,t_target_list
         
-        # 使用Food101的_image_files和_labels属性
-        train_data = [load_and_transform_image(image_file) for image_file in food_dataset_train._image_files]
-        train_targets = food_dataset_train._labels
-        test_data = [load_and_transform_image(image_file) for image_file in food_dataset_test._image_files]
-        test_targets = food_dataset_test._labels
+        train_data, train_targets = get_mate(t_train_loader)
+        test_data, test_targets = get_mate(t_test_loader)
         
+        # print('data inited')
         dataset = CustomDataset(train_data, train_targets, class_names, 'food101')
         dataset.data = train_data
         test_dataset = CustomDataset(test_data, test_targets, class_names, 'food101')
@@ -745,12 +747,18 @@ def get_train_merge_loaders(train_dataset, poison_ratio=0.05, trigger_pos='r',
     return train_merge_loader
 
 
+def un_normalize(x_normalized):
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+    x_denormalized = x_normalized * std + mean
+    return x_denormalized
 def check_loaders(loader, saved_img_name, class_names, type='clean'):
     showed_imgs, showed_lebals, showed_tags = [], [], []
-
+    
     if type == 'clean':
         for i, (imgs, labels) in enumerate(loader):
             print(imgs.shape)
+            imgs = un_normalize(imgs)
             for j in range(imgs.size(0)):
                 showed_imgs.append(imgs[j].permute(1, 2, 0))
                 showed_lebals.append(labels[j])
@@ -763,6 +771,7 @@ def check_loaders(loader, saved_img_name, class_names, type='clean'):
     else:
         for i, (imgs, labels, tags) in enumerate(loader):
             print(imgs.shape)
+            imgs = un_normalize(imgs)
             for j in range(imgs.size(0)):
                 showed_imgs.append(imgs[j].permute(1, 2, 0))
                 showed_lebals.append(labels[j])
@@ -965,7 +974,54 @@ def test_svhn():
     pass
 
 
+def test_food101():
+    train_dataset, test_dataset, class_names, num_classes = get_full_data(
+        'food101')
+
+    # print(train_dataset.data.shape,train_dataset.data[0].shape, type(train_dataset.data))
+    # print(test_dataset.data[0])
+
+    test_clean_loader = DataLoader(test_dataset, batch_size=64, pin_memory=True,
+                                   num_workers=16, shuffle=False)
+    train_clean_loader = DataLoader(
+        train_dataset, batch_size=64, num_workers=16, shuffle=True, pin_memory=True)
+    check_loaders(train_clean_loader, 'food101/train_clean_loader',
+                  class_names, 'clean')
+    check_loaders(test_clean_loader,
+                  'food101/test_clean_loader', class_names, 'clean')
+
+    test_backdoor_dataset = get_test_backdoor_dataset(
+        test_dataset, 'r', 4, 1)
+    # print('here')
+    train_merge_dataset = get_train_merge_dataset(
+        train_dataset, trigger_pos='r', trigger_size=4, target_classes=1,
+        poison_ratio=0.5, dataset_name='caltech101')
+    print(train_merge_dataset.data[0].shape, type(train_merge_dataset.data))
+
+    train_merge_loader = DataLoader(
+        train_merge_dataset, batch_size=64, num_workers=16, shuffle=True, pin_memory=True
+    )
+
+    test_backdoor_loader = DataLoader(test_backdoor_dataset, batch_size=64, pin_memory=True,
+                                      num_workers=16, shuffle=False)
+    total = 0
+    poison = 0
+    for img, label, tags in train_merge_loader:
+        total += len(tags)
+        poison += tags.sum()
+    print(total, poison)
+
+    check_loaders(train_merge_loader, 'food101/train_merge_loader',
+                  class_names, 'poison')
+    check_loaders(test_backdoor_loader,
+                  'food101/test_backdoor_loader', class_names, 'clean')
+
+    # exit()
+
+    pass
+
 if __name__ == '__main__':
     test_cifar10()
     test_svhn()
     test_caltech101()
+    test_food101()
