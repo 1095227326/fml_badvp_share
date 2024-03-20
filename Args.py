@@ -33,7 +33,7 @@ def parse_option():
                         help='num of workers to use')
     parser.add_argument('--epochs', type=int, default=5,
                         help='number of training epoch5s')
-    parser.add_argument('--device', type=str, default= 'cuda:2',
+    parser.add_argument('--device', type=str, default= 'cuda:0',
                         help='gpu')
     parser.add_argument('--tqdm', default=True,
                     help='whether the tqdm is displayed')

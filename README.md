@@ -1,6 +1,7 @@
 # fml_badvp_share
 share with syl
 
+<<<<<<< HEAD
 sh
 
 nohup python Main.py --model rn50 --epoch 5 --round 50 --merge_mode avg --mode iid --device cuda:0  > rn50.out &
