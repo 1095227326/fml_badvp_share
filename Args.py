@@ -147,7 +147,7 @@ def parse_option():
             print('Save Dir Error !')
             exit()
     else :
-        os.mkdir(t_path)
+        os.makedirs(t_path)
     args.save_dir = t_path
     # if args.save_dir == 'default':
     #     ii = 0
