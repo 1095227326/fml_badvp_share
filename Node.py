@@ -447,7 +447,7 @@ class Global_node():
         self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
 
     def merge(self, prompters, select_idx_list, subset_idx_list, args):
-        if args.merge_mode == 'avg' or 'prox' or 'moon':
+        if args.merge_mode in ['avg', 'prox', 'moon']:
             self.merge_avg(prompters, select_idx_list, subset_idx_list, args)
         elif args.merge_mode == 'opt':
             self.merge_opt(prompters, select_idx_list, subset_idx_list, args)
