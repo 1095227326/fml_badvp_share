@@ -146,7 +146,7 @@ class Local_node2():
         pass
     
     def load_checkpoint(self):
-        filename = './save/node_{}.pth'.format(self.id)
+        filename = os.path.join(self.save_dir,'node_{}.pth'.format(self.id))
          # 检查文件是否存在
         if os.path.isfile(filename):
             checkpoint = torch.load(filename)
@@ -447,7 +447,7 @@ class Global_node():
         self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
 
     def merge(self, prompters, select_idx_list, subset_idx_list, args):
-        if args.merge_mode == 'avg' or 'prox' or 'moon':
+        if args.merge_mode in ['avg', 'prox', 'moon']:
             self.merge_avg(prompters, select_idx_list, subset_idx_list, args)
         elif args.merge_mode == 'opt':
             self.merge_opt(prompters, select_idx_list, subset_idx_list, args)
@@ -587,7 +587,7 @@ def train_merge(indices, train_loader, model, prev_prompt, global_prompter, prom
                     
                 loss = (criterion(output[:num_poison], poison_targets) * num_poison * args.lmbda
                         + criterion(output[num_poison:], clean_targets) * (num_data - num_poison)) / num_data + (mu / 2) * proximal_term
-            elif args.merge_mode == 'avg':
+            elif args.merge_mode == 'avg' or 'opt':
                 loss = (criterion(output[:num_poison], poison_targets) * num_poison * args.lmbda
                         + criterion(output[num_poison:], clean_targets) * (num_data - num_poison)) / num_data
             elif args.merge_mode == 'moon':
@@ -638,7 +638,7 @@ def train_merge(indices, train_loader, model, prev_prompt, global_prompter, prom
                     proximal_term += (w - w_t).norm(2)
                     
                 loss = criterion(output, target) * args.lmbda + (mu / 2) * proximal_term
-            elif args.merge_mode == 'avg':
+            elif args.merge_mode == 'avg' or 'opt':
                 loss = criterion(output, target) * args.lmbda
             elif args.merge_mode == 'moon':
                 global_prompter.to(device)
@@ -685,7 +685,7 @@ def train_merge(indices, train_loader, model, prev_prompt, global_prompter, prom
                     proximal_term += (w - w_t).norm(2)
                     
                 loss = criterion(output, target) + (mu / 2) * proximal_term
-            elif args.merge_mode == 'avg':
+            elif args.merge_mode == 'avg' or 'opt':
                 # print(output.shape, poison_targets.shape)
 
                 loss = criterion(output, target)
@@ -753,7 +753,7 @@ def train_clean(indices, train_loader, model, prev_prompt, global_prompter, prom
                 proximal_term += (w - w_t).norm(2)
                 
             loss = criterion(output, target) + (mu / 2) * proximal_term
-        elif args.merge_mode == 'avg':
+        elif args.merge_mode == 'avg' or 'opt':
             loss = criterion(output, target)
         elif args.merge_mode == 'moon':
             global_prompter.to(device)

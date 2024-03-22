@@ -33,7 +33,7 @@ def parse_option():
                         help='num of workers to use')
     parser.add_argument('--epochs', type=int, default=5,
                         help='number of training epoch5s')
-    parser.add_argument('--device', type=str, default= 'cuda:2',
+    parser.add_argument('--device', type=str, default= 'cuda:0',
                         help='gpu')
     parser.add_argument('--tqdm', default=True,
                     help='whether the tqdm is displayed')
@@ -111,8 +111,8 @@ def parse_option():
                         help='The coefficient to balance the model utility and attack effectiveness.')
     parser.add_argument('--poison_seed', type=int, default=0,
                         help='seed for sampling poisoning data samples')
-    parser.add_argument('--mu', type=float, default=0.01, help='proximal term constant')
-    parser.add_argument('--nu', type=float, default=0.001, help='moon term constant')
+    parser.add_argument('--mu', type=float, default=0.1, help='proximal term constant')
+    parser.add_argument('--nu', type=float, default=0.01, help='moon term constant')
     parser.add_argument('--temperature', type=float, default=0.5, help='the temperature parameter for contrastive loss')
     # other
     parser.add_argument('--seed', type=int, default=42,
@@ -145,7 +145,7 @@ def parse_option():
             print('Save Dir Error !')
             exit()
     else :
-        os.mkdir(t_path)
+        os.makedirs(t_path)
     args.save_dir = t_path
     # if args.save_dir == 'default':
     #     ii = 0

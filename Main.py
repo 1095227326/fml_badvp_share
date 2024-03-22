@@ -108,7 +108,7 @@ def main(args):
         # 选取select_num 数量的client 不重复
         select_idx = np.random.choice(
             range(0, args.client_num), args.select_num, replace=False)
-
+        # select_idx = [14, 57, 67, 76, 17]
         print('Round {}/{} the selected nodes is '.format(i+1, args.round), select_idx)
 
         will_merge_prompter_list = []
@@ -133,7 +133,7 @@ def main(args):
             # Data.check_loaders(test_backdoor_loader,'fml_test_merge_loader',class_names,'clean')
             # Data.check_loaders(test_clean_loader,'fml_test_clean_loader',class_names,'clean')
 
-            global_prompter_current = now_node.prompter
+            global_prompter_current = deepcopy(now_node.prompter)
             # continue
             # 开始训练
 
