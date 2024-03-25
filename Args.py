@@ -113,8 +113,8 @@ def parse_option():
                         help='The coefficient to balance the model utility and attack effectiveness.')
     parser.add_argument('--poison_seed', type=int, default=0,
                         help='seed for sampling poisoning data samples')
-    parser.add_argument('--mu', type=float, default=0.1, help='proximal term constant')
-    parser.add_argument('--nu', type=float, default=0.01, help='moon term constant')
+    parser.add_argument('--mu', type=float, default=0.01, help='proximal term constant')
+    parser.add_argument('--nu', type=float, default=0.001, help='moon term constant')
     parser.add_argument('--temperature', type=float, default=0.5, help='the temperature parameter for contrastive loss')
     # other
     parser.add_argument('--seed', type=int, default=42,
