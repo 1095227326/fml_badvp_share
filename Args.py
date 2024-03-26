@@ -113,8 +113,8 @@ def parse_option():
                         help='The coefficient to balance the model utility and attack effectiveness.')
     parser.add_argument('--poison_seed', type=int, default=0,
                         help='seed for sampling poisoning data samples')
-    parser.add_argument('--mu', type=float, default=0.1, help='proximal term constant')
-    parser.add_argument('--nu', type=float, default=0.01, help='moon term constant')
+    parser.add_argument('--mu', type=float, default=0.01, help='proximal term constant')
+    parser.add_argument('--nu', type=float, default=0.001, help='moon term constant')
     parser.add_argument('--temperature', type=float, default=0.5, help='the temperature parameter for contrastive loss')
     # other
     parser.add_argument('--seed', type=int, default=42,
@@ -136,11 +136,34 @@ def parse_option():
     args = parser.parse_args()
     args.gpu = int(args.device[-1])
     
-    t_path = './save/{}_{}_{}_{}_{}_{}'.format(args.dataset,args.model,args.mode,args.merge_mode,args.poison_ratio,args.poison_client_num)
-    if args.isfml :
-        args.merge_mode = 'avg'
-        t_path = '{}_notfml'.format(t_path)
-    print('Save_Path Is {}'.format(t_path))
+    
+    t_save_path = './save_{}_{}_{}_{}_{}'
+    
+    t_dataset = args.dataset
+    
+    t_spilit = ''
+    if args.mode == 'iid':
+        t_spilit = 'iid'
+        pass
+    elif args.mode == 'noiid':
+        t_spilit = 'noiid_{}'.format(args.alpha)
+        
+    t_merge_mode = args.merge_mode
+    
+    t_model = args.model    
+    
+    t_fmltag = 'fml' if args.isfml else 'notfml'
+
+    
+    t_save_path = t_save_path.format(t_dataset,t_spilit,t_merge_mode,t_model,t_fmltag)
+    
+    # t_path = './save/{}_{}_{}_{}_{}_{}'.format(args.dataset,args.model,args.mode,args.merge_mode,args.poison_ratio,args.poison_client_num)
+    # if args.isfml :
+    #     args.merge_mode = 'avg'
+    #     t_path = '{}_notfml'.format(t_path)
+    
+    t_path = t_save_path
+    print('Save_Path Is \n{}'.format(t_path))
    
     if os.path.exists(t_path)  :
         if  not os.listdir(t_path) == []:
