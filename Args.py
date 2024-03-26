@@ -137,7 +137,7 @@ def parse_option():
     args.gpu = int(args.device[-1])
     
     
-    t_save_path = './save_{}_{}_{}_{}_{}'
+    t_save_path = './save/{}_{}_{}_{}_{}'
     
     t_dataset = args.dataset
     
