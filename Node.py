@@ -462,8 +462,8 @@ class Global_node():
         # 计算选的10个客户端的数据样本总量
         s = 0 
         
-        for i in range(args.select_num):
-            s += len(subset_idx_list[select_idx_list[i]])
+        for idx in select_idx_list:
+            s += len(subset_idx_list[idx])
 
         # 初始化全局模型权重为0
         global_weights = {name: torch.zeros_like(
@@ -535,6 +535,15 @@ class Global_node():
         if isbest:
             shutil.copyfile(savefile, bestfile)
 
+    def init_from_dict(self,prompter_dict):
+        new_weights = {name: torch.zeros_like(
+            param) for name, param in self.prompter.state_dict().items()}
+        
+        model_weights = prompter_dict
+        for name, param in model_weights.items():
+            new_weights[name] += param
+
+        self.prompter.load_state_dict(new_weights)
 def train_merge(indices, train_loader, model, prev_prompt, global_prompter, prompter, optimizer, scheduler, criterion, epoch, args):
 
     device = args.device
