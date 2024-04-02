@@ -17,10 +17,13 @@ def spilit_will_merge(num,will_merge_prompter_list,
     n_subset_idx_list = [[] for _ in range(num)]
     print(len(n_will_merge_prompter_list))
     for id,idx in enumerate(sorted_idx_list):
-        print(idx,int(id/each_num))
-        n_will_merge_prompter_list[int(id/each_num)].append(will_merge_prompter_list[idx])
-        n_select_idx_list[int(id/each_num)].append(select_idx_list[idx])
-        n_subset_idx_list[int(id/each_num)].append(subset_idx_list[idx])
+        tar_node_id = min(int(id/each_num))
+        if tar_node_id >= num:
+            continue
+        print(idx,tar_node_id)
+        n_will_merge_prompter_list[tar_node_id].append(will_merge_prompter_list[idx])
+        n_select_idx_list[tar_node_id].append(select_idx_list[idx])
+        n_subset_idx_list[tar_node_id].append(subset_idx_list[idx])
 
     return n_will_merge_prompter_list,n_select_idx_list,n_subset_idx_list
 
@@ -178,7 +181,7 @@ def parse_option():
     
     t_model = args.model    
     
-    t_issort = 'sort' if args.issort else 'notsort'
+    t_issort = 'sort' if args.issort == True else 'notsort'
 
     t_global_num = args.global_num
     
