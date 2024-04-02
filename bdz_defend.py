@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 from typing import List
 import time,os
+import torch
 import argparse
 
 def spilit_will_merge(num,will_merge_prompter_list,
@@ -17,7 +18,7 @@ def spilit_will_merge(num,will_merge_prompter_list,
     n_subset_idx_list = [[] for _ in range(num)]
     print(len(n_will_merge_prompter_list))
     for id,idx in enumerate(sorted_idx_list):
-        tar_node_id = min(int(id/each_num))
+        tar_node_id = int(id/each_num)
         if tar_node_id >= num:
             continue
         print(idx,tar_node_id)
@@ -462,6 +463,9 @@ def main(args):
             global_node.save_checkpoint(isbest=True)
             global_node.best_acc = bglobal_acc
         
+        torch.save({'state_dict':  b_dict,'acc': bglobal_acc,'asr':bglobal_asr},
+                   os.path.join(args.save_dir,'g_{}.pth'.format(i+1)))
+
         print('Round {}/{} Globalnode Acc is {:4.2f} Asr is {:4.2f} '.format(i +
               1, args.round, bglobal_acc, bglobal_asr))
 
