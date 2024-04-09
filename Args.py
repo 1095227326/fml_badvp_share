@@ -137,7 +137,7 @@ def parse_option():
     args.gpu = int(args.device[-1])
     
     
-    t_save_path = './save/{}_{}_{}_{}_{}'
+    t_save_path = './save/{}_{}_{}_{}_{}_{}'
     
     t_dataset = args.dataset
     
@@ -151,11 +151,11 @@ def parse_option():
     t_merge_mode = args.merge_mode
     
     t_model = args.model    
-    
+    t_trigger_pos = args.trigger_pos
     t_fmltag = 'fml' if args.isfml else 'notfml'
 
     
-    t_save_path = t_save_path.format(t_dataset,t_spilit,t_merge_mode,t_model,t_fmltag)
+    t_save_path = t_save_path.format(t_dataset,t_spilit,t_merge_mode,t_model,t_trigger_pos,t_fmltag)
     
     # t_path = './save/{}_{}_{}_{}_{}_{}'.format(args.dataset,args.model,args.mode,args.merge_mode,args.poison_ratio,args.poison_client_num)
     # if args.isfml :

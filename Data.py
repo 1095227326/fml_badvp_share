@@ -592,6 +592,9 @@ def add_trigger(img, trigger, trigger_size=4, trigger_pos='l'):
     elif trigger_pos == 'r':  # 右下角
         pos = (image_shape[0] - trigger_size[0],
                image_shape[1] - trigger_size[1])
+    elif trigger_pos == 'c':  # 正中心
+        pos = (image_shape[0]//2 - trigger_size[0]//2,
+               image_shape[1]//2 - trigger_size[1]//2)
     else:
         print(trigger_pos)
         raise ValueError("Invalid trigger position. Use 'l', 'm', or 'r'.")
@@ -604,12 +607,6 @@ def add_trigger(img, trigger, trigger_size=4, trigger_pos='l'):
     # print(modified_image.shape)
 
     return modified_image
-
-    # Apply trigger
-    img[:, pos_begin[1]:pos_begin[1]+trigger_size[0],
-        pos_begin[0]:pos_begin[0]+trigger_size[1]] = trigger
-
-    return img
 
 
 def test_add_triggre(o_img, trigger_size=4):
@@ -849,10 +846,10 @@ def test_cifar10():
     # print(train_dataset.data[0])
 
     test_backdoor_dataset = get_test_backdoor_dataset(
-        test_dataset, 'r', 4, 1)
+        test_dataset, 'c', 4, 1)
     # print('here')
     train_merge_dataset = get_train_merge_dataset(
-        train_dataset, trigger_pos='r', trigger_size=4, target_classes=1,
+        train_dataset, trigger_pos='c', trigger_size=4, target_classes=1,
         poison_ratio=0.05, dataset_name='cifar10')
 
     train_clean_loader = DataLoader(
@@ -1024,4 +1021,4 @@ if __name__ == '__main__':
     test_cifar10()
     test_svhn()
     test_caltech101()
-    test_food101()
+    # test_food101()
