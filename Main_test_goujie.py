@@ -68,6 +68,21 @@ def init_node_data(node_id, train_dataset, test_dataset, subset_idx_list, args):
 
     return train_merge_loader, train_clean_loader, test_clean_loader, test_backdoor_loader
 
+def init_global_data(test_dataset,poison_pairs,args):
+    batch_size = args.batch_size
+    num_workers = args.num_workers
+    g_test_loaders  = []
+    for pos, target in poison_pairs:
+        ttest_backdoor_dataset = Data.get_test_backdoor_dataset(
+        test_dataset, trigger_pos=pos,
+        trigger_size=args.trigger_size, target_classes=target)
+        ttest_backdoor_loader = DataLoader(
+        ttest_backdoor_dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=True, shuffle=False)
+        g_test_loaders.append((pos,target,ttest_backdoor_loader))
+    return g_test_loaders  
+    
+        
+    
 
 def main(args):
     print(args)
@@ -79,6 +94,17 @@ def main(args):
 
     poison_client_idx = np.random.choice(
         range(0, args.client_num), args.poison_client_num, replace=False)
+    if args.trigger_pos == 'random':
+        args.trigger_pos = 'r'
+        # n = len(poison_client_idx)
+        # del n
+        poison_client_trigger_pos_list = ['r'] * (len(poison_client_idx) // 3 + (len(poison_client_idx) % 3 > 0)) + ['m'] * (len(poison_client_idx) // 3 + (len(poison_client_idx) % 3 > 1)) + ['c'] * (len(poison_client_idx) // 3)
+    else :
+        poison_client_trigger_pos_list = [args.trigger_pos] * len(poison_client_idx)
+    poison_client_target_list = [ 1 ] * len(poison_client_idx)
+    
+    poison_pairs = list(set(zip(poison_client_trigger_pos_list, poison_client_target_list)))
+    
     clean_client_idx = [i for i in range(
         args.client_num) if i not in poison_client_idx]
 
@@ -99,7 +125,7 @@ def main(args):
     
     # 初始化将要使用的大模型
     model = init_model(args)
-    
+    g_test_loaders = init_global_data(test_dataset,poison_pairs,args)
     # 获取indices
     test_clean_loader = Data.DataLoader(
         test_dataset, args.batch_size, num_workers=16, shuffle=True)
@@ -125,10 +151,20 @@ def main(args):
                 global_node.prompter.state_dict())  # 给本轮选中的客户端赋予server模型
             now_node: Local_node2 = node_list[node_id]
             # 数据初始化
+            idx_positions = np.where(poison_client_idx == node_id)[0]
+            if is_poison:
+                if idx_positions.size > 0:
+                    idx_positions = idx_positions[0]
+                    # print(idx_positions)
+                args.trigger_pos = poison_client_trigger_pos_list[idx_positions]
+                args.target_class = poison_client_target_list[idx_positions]
+            else :
+                args.trigger_pos = 'r'
+                args.target_class = 1
             train_merge_loader, train_clean_loader, test_clean_loader, test_backdoor_loader = \
                 init_node_data(node_id, train_dataset,
                                test_dataset, subset_idx_list, args)
-
+        
             print('Node_{:3d} Data Prepared | train_merge {:<4d} train_clean {:<4d} test_clean {:<4d} test_backdoor {:<4d}'.format(
                 node_id, len(train_merge_loader), len(train_clean_loader), len(test_clean_loader), len(test_backdoor_loader)))
             # Data.check_loaders(train_merge_loader,'fml_train_merge_loader',class_names,'poison')
@@ -160,7 +196,7 @@ def main(args):
                 else:
                     loss, top1 = train_clean(indices, train_clean_loader, model, prev_prompt, global_prompter_current, now_node.prompter, now_node.optimizer,
                                              now_node.scheduler, now_node.criterion, now_node.epoch + 1, now_node.args)
-
+                # loss = 1.0
                 if is_poison:
                     desc = 'Round {}/{} Node_{} Poison Epoch {} Loss is {:4.5f}'
                 else:
@@ -172,7 +208,11 @@ def main(args):
                            now_node.prompter, now_node.criterion, now_node.args)
             asr = validate(indices, test_backdoor_loader, model,
                            now_node.prompter, now_node.criterion, now_node.args)
-            t_save_data = {'node_id':node_id,'acc':acc,'asr':asr,'round':i+1,'dict':now_node.prompter.state_dict(),'ispoison':is_poison}
+            
+            t_save_data = {'node_id':node_id,'acc':acc,'asr':asr,'round':i+1,
+                           'dict':now_node.prompter.state_dict(),'ispoison':is_poison,
+                           'trigger_pos':args.trigger_pos,'target_class':args.target_class}
+            
             number_of_elements = len(save_data)
             save_data[str(number_of_elements)] =deepcopy(t_save_data)
             
@@ -204,9 +244,15 @@ def main(args):
         # 测试
         global_acc = validate(indices, test_clean_loader, model,
                               global_node.prompter, global_node.criterion, global_node.args)
-        global_asr = validate(indices, test_backdoor_loader, model,
-                              global_node.prompter, global_node.criterion, global_node.args)
-        
+        print('Round {}/{} Globalnode Acc is {:4.2f}'.format(i +
+              1, args.round, global_acc))
+        global_asrs = []
+        for pos,target,g_test_loader in g_test_loaders:
+            
+            global_asr = validate(indices, g_test_loader, model,
+                                global_node.prompter, global_node.criterion, global_node.args)
+            print(f"Round {i+1}/{args.round} Global Position: {pos}, Target: {target}, ASR: {global_asr:.2f}%")
+            global_asrs.append(pos,target,global_asr)
         # 更新数据
         global_node.acc = global_acc
         global_node.asr = global_asr
@@ -214,11 +260,12 @@ def main(args):
         if global_node.best_acc < global_acc:
             # global_node.save_checkpoint(isbest=True)
             global_node.best_acc = global_acc
-        t_save_data = {'node_id':'global_node','acc':global_acc,'asr':global_asr,'round':i+1,'dict':global_node.prompter.state_dict(),'ispoison':None}
+        t_save_data = {'node_id':'global_node','acc':global_acc,'asr':global_asrs,
+                       'round':i+1,'dict':global_node.prompter.state_dict(),'ispoison':None}
         number_of_elements = len(save_data)
-        save_data[str(number_of_elements)] =deepcopy(t_save_data)
-        print('Round {}/{} Globalnode Acc is {:4.2f} Asr is {:4.2f} '.format(i +
-              1, args.round, global_acc, global_asr))
+        save_data[str(number_of_elements)] = deepcopy(t_save_data)
+        # print('Round {}/{} Globalnode Acc is {:4.2f} Asr is {:4.2f} '.format(i +
+        #       1, args.round, global_acc, global_asr))
 
     import torch,os
     file_path = os.path.join(args.save_dir,'final.pth')
