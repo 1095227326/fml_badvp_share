@@ -1019,6 +1019,6 @@ def test_food101():
 
 if __name__ == '__main__':
     test_cifar10()
-    test_svhn()
-    test_caltech101()
+    # test_svhn()
+    # test_caltech101()
     # test_food101()

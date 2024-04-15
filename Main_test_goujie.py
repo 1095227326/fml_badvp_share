@@ -79,11 +79,35 @@ def init_global_data(test_dataset,poison_pairs,args):
         ttest_backdoor_loader = DataLoader(
         ttest_backdoor_dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=True, shuffle=False)
         g_test_loaders.append((pos,target,ttest_backdoor_loader))
+        
+        # Data.check_loaders(ttest_backdoor_loader,'{}_{}_gtest_loader'.format(pos,target),class_names,'clean')
     return g_test_loaders  
     
+def check_all_loaders(g_loaders,poison_client_idx,\
+    poison_client_trigger_pos_list,poison_client_target_list,args,\
+        train_dataset, test_dataset,subset_idx_list)  :
+        n_args = deepcopy(args)
+        for pos,target,gloader in g_loaders:
+            class_names = [_ for _ in range(100)]
+            Data.check_loaders(gloader,'{}_{}_gtest_loader'.format(pos,target),class_names,'clean')
         
-    
-
+        for node_id in poison_client_idx:
+            idx_positions = np.where(poison_client_idx == node_id)[0]
+            if idx_positions.size > 0:
+                idx_positions = idx_positions[0]
+                        # print(idx_positions)
+            n_args.trigger_pos = poison_client_trigger_pos_list[idx_positions]
+            n_args.target_class = poison_client_target_list[idx_positions]
+          
+            train_merge_loader, train_clean_loader, test_clean_loader, test_backdoor_loader = \
+                    init_node_data(node_id, train_dataset,
+                                test_dataset, subset_idx_list, n_args)
+            Data.check_loaders(train_clean_loader,'{}_train_clean_loader'.format(node_id),class_names,'clean')
+            Data.check_loaders(test_clean_loader,'{}_test_clean_loader'.format(node_id),class_names,'clean')
+            Data.check_loaders(test_backdoor_loader,'{}_test_poison_{}_{}'.\
+                format(node_id,n_args.trigger_pos,n_args.target_class),class_names,'clean')
+            Data.check_loaders(train_merge_loader,'{}_train_poison_{}_{}'.\
+                format(node_id,n_args.trigger_pos,n_args.target_class),class_names,'poison')
 def main(args):
     print(args)
     np.random.seed(42)
@@ -125,12 +149,16 @@ def main(args):
     
     # 初始化将要使用的大模型
     model = init_model(args)
-    g_test_loaders = init_global_data(test_dataset,poison_pairs,args)
+    # g_test_loaders = init_global_data(test_dataset,poison_pairs,args)
     # 获取indices
     test_clean_loader = Data.DataLoader(
         test_dataset, args.batch_size, num_workers=16, shuffle=True)
     indices = get_map_indices(model, test_clean_loader, num_classes, device)
 
+    # check_all_loaders(g_test_loaders,poison_client_idx,\
+    # poison_client_trigger_pos_list,poison_client_target_list,args,\
+    #     train_dataset, test_dataset,subset_idx_list)
+    # f ={'c':False,'m':False,'r':False} 
     for i in range(args.round):
         # start_time = time.time()
         # 选取select_num 数量的client 不重复
@@ -158,13 +186,34 @@ def main(args):
                     # print(idx_positions)
                 args.trigger_pos = poison_client_trigger_pos_list[idx_positions]
                 args.target_class = poison_client_target_list[idx_positions]
+                
             else :
                 args.trigger_pos = 'r'
                 args.target_class = 1
             train_merge_loader, train_clean_loader, test_clean_loader, test_backdoor_loader = \
                 init_node_data(node_id, train_dataset,
                                test_dataset, subset_idx_list, args)
-        
+                
+            # if is_poison  :
+            #     # f[args.trigger_pos] = True
+            #     Data.check_loaders(train_clean_loader,'a{}_{}_train_clean_loader'.\
+            #         format(i+1,node_id),class_names,'clean')
+            #     Data.check_loaders(test_clean_loader,'a{}_{}_test_clean_loader'.\
+            #         format(i+1,node_id),class_names,'clean')
+            #     Data.check_loaders(test_backdoor_loader,'a{}_{}_test_poison_{}_{}'.\
+            #         format(i+1,node_id,args.trigger_pos,args.target_class),class_names,'clean')
+            #     Data.check_loaders(train_merge_loader,'a{}_{}_train_poison_{}_{}'.\
+            #         format(i+1,node_id,args.trigger_pos,args.target_class),class_names,'poison')
+            # else :
+            #     Data.check_loaders(train_clean_loader,'b{}_{}_train_clean_loader'.\
+            #         format(i+1,node_id),class_names,'clean')
+            #     Data.check_loaders(test_clean_loader,'b{}_{}_test_clean_loader'.\
+            #         format(i+1,node_id),class_names,'clean')
+            #     Data.check_loaders(test_backdoor_loader,'b{}_{}_test_poison_{}_{}'.\
+            #         format(i+1,node_id,args.trigger_pos,args.target_class),class_names,'clean')
+            #     Data.check_loaders(train_merge_loader,'b{}_{}_train_poison_{}_{}'.\
+            #         format(i+1,node_id,args.trigger_pos,args.target_class),class_names,'poison')
+                
             print('Node_{:3d} Data Prepared | train_merge {:<4d} train_clean {:<4d} test_clean {:<4d} test_backdoor {:<4d}'.format(
                 node_id, len(train_merge_loader), len(train_clean_loader), len(test_clean_loader), len(test_backdoor_loader)))
             # Data.check_loaders(train_merge_loader,'fml_train_merge_loader',class_names,'poison')
@@ -223,14 +272,13 @@ def main(args):
                 # now_node.save_checkpoint(isbest=True)
                 now_node.best_acc = acc
                 now_node.best_asr = asr
-                
+                  
             if is_poison:
-                desc = 'Round {}/{} Node_{} Poison  Acc is {:5.2f} Asr is {:5.2f} '
+                desc = 'Round {}/{} Node_{} Poison_{}_{}  Acc is {:5.2f} Asr is {:5.2f} '
+                print(desc.format(i+1, args.round, node_id,args.trigger_pos,args.target_class, acc, asr))
             else:
-                desc = 'Round {}/{} Node_{} Clean   Acc is {:5.2f} Asr is {:5.2f} '
-
-            print(desc.format(
-                i+1, args.round, node_id, acc, asr))            
+                desc = 'Round {}/{} Node_{} Clean         Acc is {:5.2f} Asr is {:5.2f} '
+                print(desc.format(i+1, args.round, node_id, acc, asr))            
         
             node_list[node_id] = now_node 
             select_idx_list.append(node_id)
@@ -243,16 +291,26 @@ def main(args):
         
         # 测试
         global_acc = validate(indices, test_clean_loader, model,
-                              global_node.prompter, global_node.criterion, global_node.args)
+                             global_node.prompter, global_node.criterion, global_node.args)
+        # global_acc = 1.0
         print('Round {}/{} Globalnode Acc is {:4.2f}'.format(i +
               1, args.round, global_acc))
         global_asrs = []
-        for pos,target,g_test_loader in g_test_loaders:
-            
-            global_asr = validate(indices, g_test_loader, model,
+        
+     
+        
+        for pos, target in poison_pairs:
+            gtest_backdoor_dataset = Data.get_test_backdoor_dataset(
+            test_dataset, trigger_pos=pos,
+            trigger_size=args.trigger_size, target_classes=target)
+            gtest_backdoor_loader = DataLoader(
+            gtest_backdoor_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False)
+            global_asr = validate(indices, gtest_backdoor_loader, model,
                                 global_node.prompter, global_node.criterion, global_node.args)
+            # global_asr = 1.0
             print(f"Round {i+1}/{args.round} Global Position: {pos}, Target: {target}, ASR: {global_asr:.2f}%")
-            global_asrs.append(pos,target,global_asr)
+            global_asrs.append([pos,target,global_asr])
+            
         # 更新数据
         global_node.acc = global_acc
         global_node.asr = global_asr
