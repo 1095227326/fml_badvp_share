@@ -5,11 +5,11 @@ import Data
 from copy import deepcopy
 from torch.utils.data import DataLoader
 import numpy as np
-from typing import List
 import time
+import torch,os
+import random
 
 save_data = {}
-# save_id : {node_id round acc asr ispoison }
 
 def init_original_data(args):
     dataset_name = args.dataset
@@ -38,8 +38,9 @@ def init_node_data(node_id, train_dataset, test_dataset, subset_idx_list, args):
     del temp_data, temp_targets
 
     poison_ratio = args.poison_ratio
-    trigger_size = args.trigger_size
+    trigger_size = args.trigger_size 
     trigger_pos = args.trigger_pos
+    print(trigger_pos)
     target_class = args.target_class
     batch_size = args.batch_size
     num_workers = args.num_workers
@@ -67,6 +68,8 @@ def init_node_data(node_id, train_dataset, test_dataset, subset_idx_list, args):
         test_backdoor_dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=True, shuffle=False)
 
     return train_merge_loader, train_clean_loader, test_clean_loader, test_backdoor_loader
+
+
 
 def init_global_data(test_dataset,poison_pairs,args):
     batch_size = args.batch_size
@@ -116,19 +119,31 @@ def main(args):
     train_dataset, test_dataset, class_names, num_classes, subset_idx_list = init_original_data(
         args)
 
+    # 选定poison 客户端的编号
     poison_client_idx = np.random.choice(
         range(0, args.client_num), args.poison_client_num, replace=False)
+    # 为每个poison 客户端指定trigger_pos 和 target_class
+    poison_client_trigger_pos_list,poison_client_target_list = [],[]
     if args.trigger_pos == 'random':
-        args.trigger_pos = 'r'
-        # n = len(poison_client_idx)
-        # del n
-        poison_client_trigger_pos_list = ['r'] * (len(poison_client_idx) // 3 + (len(poison_client_idx) % 3 > 0)) + ['m'] * (len(poison_client_idx) // 3 + (len(poison_client_idx) % 3 > 1)) + ['c'] * (len(poison_client_idx) // 3)
+        local_random = random.Random(99)
+        possiable_pos = ['bl','tl','br','tr','tc','bc','lc','rc','c',]
+        pos_idx =  [local_random.randint(0, 7) for _ in range(len(poison_client_idx))]
+        tar_list = [local_random.randint(0, num_classes-1) for _ in range(len(poison_client_idx))]
+        args.trigger_pos = 'br'
+
+        for ii in range(len(poison_client_idx)):
+            poison_client_trigger_pos_list.append(possiable_pos[pos_idx[ii]])
+        # poison_client_trigger_pos_list = ['r'] * (len(poison_client_idx) // 3 + (len(poison_client_idx) % 3 > 0)) + ['m'] * (len(poison_client_idx) // 3 + (len(poison_client_idx) % 3 > 1)) + ['c'] * (len(poison_client_idx) // 3)
     else :
         poison_client_trigger_pos_list = [args.trigger_pos] * len(poison_client_idx)
-    poison_client_target_list = [ 1 ] * len(poison_client_idx)
+        
+    poison_client_target_list = [_ for _ in tar_list]
+    print(poison_client_trigger_pos_list)
+    print(poison_client_target_list)
+    # 生成pair
     
     poison_pairs = list(set(zip(poison_client_trigger_pos_list, poison_client_target_list)))
-    
+    print(poison_pairs)
     clean_client_idx = [i for i in range(
         args.client_num) if i not in poison_client_idx]
 
@@ -188,7 +203,7 @@ def main(args):
                 args.target_class = poison_client_target_list[idx_positions]
                 
             else :
-                args.trigger_pos = 'r'
+                args.trigger_pos = 'br'
                 args.target_class = 1
             train_merge_loader, train_clean_loader, test_clean_loader, test_backdoor_loader = \
                 init_node_data(node_id, train_dataset,
@@ -325,7 +340,7 @@ def main(args):
         # print('Round {}/{} Globalnode Acc is {:4.2f} Asr is {:4.2f} '.format(i +
         #       1, args.round, global_acc, global_asr))
 
-    import torch,os
+   
     file_path = os.path.join(args.save_dir,'final.pth')
     print(file_path)
     torch.save(save_data,file_path)

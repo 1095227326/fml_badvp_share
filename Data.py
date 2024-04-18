@@ -156,14 +156,6 @@ def get_trigger(trigger_size=4):
 #     return trigger
 
 def get_full_data(dataset_name):
-    """
-    对指定的数据集进行IID或non-IID划分。
-
-    :param dataset_name: 数据集名称，支持 'svhn' 或 'cifar10'
-    :param iid: 是否进行IID划分，默认为True
-    :param num_users: 划分的用户（子集）数量
-    :return: 划分后的数据集列表，每个元素对应一个用户的数据集
-    """
     if dataset_name == 'svhn':
         num_classes = 10
         transform = transforms.Compose([
@@ -529,6 +521,7 @@ def get_train_subsets(train_dataset, num_client, spilit_mode='iid', seed=42, num
 
 def add_triggerss(img, trigger, trigger_size=4, trigger_pos='l'):
     # 左上角 右下角
+    # t停止使用
     o_img = img.clone()
     o_img = o_img.permute(1, 2, 0)
     img_size = tuple(o_img.shape[:2])
@@ -584,20 +577,28 @@ def add_trigger(img, trigger, trigger_size=4, trigger_pos='l'):
     - 元组(int, int)，触发器在图像中的起始位置（y, x）。
     """
     # print(trigger_pos)
-    if trigger_pos == 'l':  # 左下角
+    if trigger_pos == 'bl':  # 左下角
         pos = (image_shape[0] - trigger_size[0], 0)
-    elif trigger_pos == 'm':  # 中下角
-        pos = (image_shape[0] - trigger_size[0],
-               image_shape[1]//2 - trigger_size[1]//2)
-    elif trigger_pos == 'r':  # 右下角
-        pos = (image_shape[0] - trigger_size[0],
-               image_shape[1] - trigger_size[1])
+    elif trigger_pos == 'tl':  # 左上角
+        pos = (0, 0)
+    elif trigger_pos == 'br':  # 右下角
+        pos = (image_shape[0] - trigger_size[0], image_shape[1] - trigger_size[1])
+    elif trigger_pos == 'tr':  # 右上角
+        pos = (0, image_shape[1] - trigger_size[1])
+    elif trigger_pos == 'tc':  # 顶部中心
+        pos = (0, (image_shape[1] - trigger_size[1]) // 2)
+    elif trigger_pos == 'bc':  # 底部中心
+        pos = (image_shape[0] - trigger_size[0], (image_shape[1] - trigger_size[1]) // 2)
+    elif trigger_pos == 'lc':  # 左侧中心
+        pos = ((image_shape[0] - trigger_size[0]) // 2, 0)
+    elif trigger_pos == 'rc':  # 右侧中心
+        pos = ((image_shape[0] - trigger_size[0]) // 2, image_shape[1] - trigger_size[1])
     elif trigger_pos == 'c':  # 正中心
         pos = (image_shape[0]//2 - trigger_size[0]//2,
                image_shape[1]//2 - trigger_size[1]//2)
     else:
         print(trigger_pos)
-        raise ValueError("Invalid trigger position. Use 'l', 'm', or 'r'.")
+        raise ValueError("Invalid trigger position. ")
     # print(pos)
     modified_image = np.copy(img)  # 创建图像的副本以避免修改原始图像
     trigger_height, trigger_width, _ = trigger.shape
@@ -836,6 +837,29 @@ def get_train_merge_dataset(dataset, trigger_pos='r',
             clean_data, clean_targets, _poison_data, _poison_targets, dataset.transform, dataset_name)
 
         return train_merge_dataset
+
+def random_sample_data_and_labels(data, labels, n):
+    """
+    从数据集中随机挑选n个数据和对应的标签。
+    
+    参数:
+    - data: 列表或数组，包含完整的数据集。
+    - labels: 列表或数组，包含数据集的标签。
+    - n: 整数，指定要随机挑选的数据项数量。
+    
+    返回:
+    - tuple: 包含两个列表，第一个是随机挑选的数据，第二个是对应的标签。
+    """
+    if len(data) != len(labels):
+        raise ValueError("数据和标签的数量必须匹配")
+    if n > len(data):
+        raise ValueError("请求的抽样数量超过了数据集的总数")
+    
+    indices = random.sample(range(len(data)), n)
+    selected_data = [data[i] for i in indices]
+    selected_labels = [labels[i] for i in indices]
+    
+    return selected_data, selected_labels
 
 
 def test_cifar10():
