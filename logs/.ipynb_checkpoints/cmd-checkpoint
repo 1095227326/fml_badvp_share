@@ -1,0 +1,17 @@
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode avg  --model rn50 --isfml true --trigger_pos c > ./logs/cifar10_iid_avg_rn50_c.out &
+
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode moon --model rn50 --isfml true --trigger_pos c > ./logs/cifar10_iid_moon_rn50_c.out &
+
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode prox --model rn50 --isfml true --trigger_pos c > ./logs/cifar10_iid_prox_rn50_c.out &
+
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode avg  --model rn50 --isfml true --trigger_pos m > ./logs/cifar10_iid_avg_rn50_m.out &
+
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode moon --model rn50 --isfml true --trigger_pos m > ./logs/cifar10_iid_moon_rn50_m.out &
+
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode prox --model rn50 --isfml true --trigger_pos m > ./logs/cifar10_iid_prox_rn50_m.out &
+
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode avg  --model rn50 --isfml true --trigger_pos r > ./logs/cifar10_iid_avg_rn50_r.out &
+
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode moon --model rn50 --isfml true --trigger_pos r > ./logs/cifar10_iid_moon_rn50_r.out &
+
+nohup python Main.py --batch_size 32 --dataset cifar10 --mode iid   --merge_mode prox --model rn50 --isfml true --trigger_pos r > ./logs/cifar10_iid_prox_rn50_r.out &
