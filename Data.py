@@ -155,6 +155,18 @@ def get_trigger(trigger_size=4):
     
 #     return trigger
 
+def get_mate(loader):
+    t_data_list,t_target_list = [],[]
+    for imgs,targets in tqdm(loader,disable = True):
+        imgs = imgs.permute(0,2,3,1)
+        imgs = imgs.numpy()
+        imgs = (imgs * 255).astype(np.uint8)
+        targets = targets.numpy()
+        t_data_list.extend ( [imgs[i] for i in range(imgs.shape[0])] )
+        t_target_list.extend([targets[i] for i in range(targets.shape[0])])
+
+    return t_data_list,t_target_list
+
 def get_full_data(dataset_name):
     """
     对指定的数据集进行IID或non-IID划分。
@@ -280,18 +292,6 @@ def get_full_data(dataset_name):
         
         t_train_loader = DataLoader(food_dataset_train,batch_size = 100,num_workers = 16)
         t_test_loader = DataLoader(food_dataset_test,batch_size = 100,num_workers = 16)
-
-        def get_mate(loader):
-            t_data_list,t_target_list = [],[]
-            for imgs,targets in tqdm(loader,disable = True):
-                imgs = imgs.permute(0,2,3,1)
-                imgs = imgs.numpy()
-                imgs = (imgs * 255).astype(np.uint8)
-                targets = targets.numpy()
-                t_data_list.extend ( [imgs[i] for i in range(imgs.shape[0])] )
-                t_target_list.extend([targets[i] for i in range(targets.shape[0])])
-
-            return t_data_list,t_target_list
         
         train_data, train_targets = get_mate(t_train_loader)
         test_data, test_targets = get_mate(t_test_loader)
@@ -301,9 +301,65 @@ def get_full_data(dataset_name):
         dataset.data = train_data
         test_dataset = CustomDataset(test_data, test_targets, class_names, 'food101')
         test_dataset.data = test_data
+    
+    elif dataset_name == 'tiny_img':
+        batch_size = 100
+        data_dir = 'data/tiny-imagenet-200/'
+        # num_classes = 200
+        normalize = transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2770, 0.2691, 0.2821))
+        # transform_train = transforms.Compose(
+        #     [transforms.RandomResizedCrop(32), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+        #     normalize, ])
+        transform_test = transforms.Compose([transforms.Resize(32), transforms.ToTensor(),]) # 这里transforms.Resize((32, 32)),也行
+        trainset = datasets.ImageFolder(root=os.path.join(data_dir, 'train'), transform=transform_test)
+        testset = datasets.ImageFolder(root=os.path.join(data_dir, 'val'), transform=transform_test)
+        
+        class_names = trainset.classes
+        num_classes = len(class_names)
+        # print(num_classes)
+    
+        train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers = 16, shuffle=True, pin_memory=True)
+        test_loader = torch.utils.data.DataLoader(testset, batch_size=batch_size, num_workers = 16, shuffle=False, pin_memory=True)
+        
+        train_data, train_targets = get_mate(train_loader)
+        test_data, test_targets = get_mate(test_loader)
+        
+        # print('data inited')
+        dataset = CustomDataset(train_data, train_targets, class_names, 'tiny_img')
+        dataset.data = train_data
+        test_dataset = CustomDataset(test_data, test_targets, class_names, 'tiny_img')
+        test_dataset.data = test_data
+
+    elif dataset_name == 'imagenette':
+        batch_size = 100
+        data_dir = 'data/imagenette/'
+        # num_classes = 10
+        normalize = transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2770, 0.2691, 0.2821))
+        # transform_train = transforms.Compose(
+        #     [transforms.RandomResizedCrop(32), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+        #     normalize, ])
+        transform_test = transforms.Compose([transforms.Resize((32, 32)), transforms.ToTensor(),])
+        trainset = datasets.ImageFolder(root=os.path.join(data_dir, 'train'), transform=transform_test)
+        testset = datasets.ImageFolder(root=os.path.join(data_dir, 'val'), transform=transform_test)
+        
+        class_names = trainset.classes
+        num_classes = len(class_names)
+        # print(num_classes)
+    
+        train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers = 16, shuffle=True, pin_memory=True)
+        test_loader = torch.utils.data.DataLoader(testset, batch_size=batch_size, num_workers = 16, shuffle=False, pin_memory=True)
+        
+        train_data, train_targets = get_mate(train_loader)
+        test_data, test_targets = get_mate(test_loader)
+        
+        # print('data inited')
+        dataset = CustomDataset(train_data, train_targets, class_names, 'imagenette')
+        dataset.data = train_data
+        test_dataset = CustomDataset(test_data, test_targets, class_names, 'imagenette')
+        test_dataset.data = test_data
     else:
         raise ValueError(
-            "Unsupported dataset. Choose from 'svhn' or 'cifar10'.")
+            "Unsupported dataset. ")
 
     # 数据集的总大小
     return dataset, test_dataset, class_names, num_classes
@@ -376,7 +432,12 @@ def save_imgs(images, labels, names, save_name, tags=None):
     # 调整子图的间距
     plt.tight_layout()
 
-    plt.savefig("./imgs/{}.png".format(save_name))  # 保存为高分辨率图片文件
+    # 检查目录是否存在，如果不存在则创建
+    save_path = "./imgs/{}.png".format(save_name)
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path))
+        
+    plt.savefig(save_path)  # 保存为高分辨率图片文件
 
     # 如果你还想在保存后关闭图形，以释放资源
     plt.close('all')
@@ -842,8 +903,8 @@ def test_cifar10():
     train_dataset, test_dataset, class_names, num_classes = get_full_data(
         'cifar10')
 
-    # print(train_dataset.data.shape, type(train_dataset.data), train_dataset.data[0].shape)
-    # print(train_dataset.data[0])
+    print(train_dataset.data.shape, type(train_dataset.data), train_dataset.data[0].shape)
+    print(train_dataset.data[0])
 
     test_backdoor_dataset = get_test_backdoor_dataset(
         test_dataset, 'c', 4, 1)
@@ -975,8 +1036,8 @@ def test_food101():
     train_dataset, test_dataset, class_names, num_classes = get_full_data(
         'food101')
 
-    # print(train_dataset.data.shape,train_dataset.data[0].shape, type(train_dataset.data))
-    # print(test_dataset.data[0])
+    print(train_dataset.data.shape,train_dataset.data[0].shape, type(train_dataset.data))
+    print(test_dataset.data[0])
 
     test_clean_loader = DataLoader(test_dataset, batch_size=64, pin_memory=True,
                                    num_workers=16, shuffle=False)
@@ -1017,8 +1078,102 @@ def test_food101():
 
     pass
 
+def test_tiny_img():
+    train_dataset, test_dataset, class_names, num_classes = get_full_data(
+        'tiny_img')
+
+    # print(train_dataset.data.shape,train_dataset.data[0].shape, type(train_dataset.data))
+    # print(test_dataset.data[0])
+
+    test_clean_loader = DataLoader(test_dataset, batch_size=64, pin_memory=True,
+                                   num_workers=16, shuffle=False)
+    train_clean_loader = DataLoader(
+        train_dataset, batch_size=64, num_workers=16, shuffle=True, pin_memory=True)
+    check_loaders(train_clean_loader, 'tiny_img/train_clean_loader',
+                  class_names, 'clean')
+    check_loaders(test_clean_loader,
+                  'tiny_img/test_clean_loader', class_names, 'clean')
+
+    test_backdoor_dataset = get_test_backdoor_dataset(
+        test_dataset, 'r', 4, 1)
+    # print('here')
+    train_merge_dataset = get_train_merge_dataset(
+        train_dataset, trigger_pos='r', trigger_size=4, target_classes=1,
+        poison_ratio=0.5, dataset_name='tiny_img')
+    print(train_merge_dataset.data[0].shape, type(train_merge_dataset.data))
+
+    train_merge_loader = DataLoader(
+        train_merge_dataset, batch_size=64, num_workers=16, shuffle=True, pin_memory=True
+    )
+
+    test_backdoor_loader = DataLoader(test_backdoor_dataset, batch_size=64, pin_memory=True,
+                                      num_workers=16, shuffle=False)
+    total = 0
+    poison = 0
+    for img, label, tags in train_merge_loader:
+        total += len(tags)
+        poison += tags.sum()
+    print(total, poison)
+
+    check_loaders(train_merge_loader, 'tiny_img/train_merge_loader',
+                  class_names, 'poison')
+    check_loaders(test_backdoor_loader,
+                  'tiny_img/test_backdoor_loader', class_names, 'clean')
+
+    # exit()
+
+    pass
+
+def test_imagenette():
+    train_dataset, test_dataset, class_names, num_classes = get_full_data(
+        'imagenette')
+
+    # print(train_dataset.data.shape,train_dataset.data[0].shape, type(train_dataset.data))
+    # print(test_dataset.data[0])
+
+    test_clean_loader = DataLoader(test_dataset, batch_size=64, pin_memory=True,
+                                   num_workers=16, shuffle=False)
+    train_clean_loader = DataLoader(
+        train_dataset, batch_size=64, num_workers=16, shuffle=True, pin_memory=True)
+    check_loaders(train_clean_loader, 'imagenette/train_clean_loader',
+                  class_names, 'clean')
+    check_loaders(test_clean_loader,
+                  'imagenette/test_clean_loader', class_names, 'clean')
+
+    test_backdoor_dataset = get_test_backdoor_dataset(
+        test_dataset, 'r', 4, 1)
+    # print('here')
+    train_merge_dataset = get_train_merge_dataset(
+        train_dataset, trigger_pos='r', trigger_size=4, target_classes=1,
+        poison_ratio=0.5, dataset_name='imagenette')
+    print(train_merge_dataset.data[0].shape, type(train_merge_dataset.data))
+
+    train_merge_loader = DataLoader(
+        train_merge_dataset, batch_size=64, num_workers=16, shuffle=True, pin_memory=True
+    )
+
+    test_backdoor_loader = DataLoader(test_backdoor_dataset, batch_size=64, pin_memory=True,
+                                      num_workers=16, shuffle=False)
+    total = 0
+    poison = 0
+    for img, label, tags in train_merge_loader:
+        total += len(tags)
+        poison += tags.sum()
+    print(total, poison)
+
+    check_loaders(train_merge_loader, 'imagenette/train_merge_loader',
+                  class_names, 'poison')
+    check_loaders(test_backdoor_loader,
+                  'imagenette/test_backdoor_loader', class_names, 'clean')
+
+    # exit()
+
+    pass
+
 if __name__ == '__main__':
-    test_cifar10()
+    # test_cifar10()
     # test_svhn()
     # test_caltech101()
     # test_food101()
+    # test_tiny_img()
+    test_imagenette()
