@@ -87,7 +87,7 @@ def parse_option():
     parser.add_argument('--root', type=str, default='./data/cifar10',
                         help='dataset')
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        choices=['cifar10','caltech101','svhn','food101'],
+                        choices=['cifar10','caltech101','svhn','food101','imagenette','tiny_img'],
                         help='dataset')
     parser.add_argument('--image_size', type=int, default=224,
                         help='image size')
@@ -205,8 +205,10 @@ def inti_train_data(args):
        
         if id in poison_node_idxs:
             poison_flags.append('poison')
-            poison_poss.append(possiable_pos[poison_node_randomer.randint(0,7)])
-            poison_targets.append(poison_node_randomer.randint(0,has_class_nums-1))
+            random_pos = possiable_pos[poison_node_randomer.randint(0,7)]
+            ranom_tar = poison_node_randomer.randint(0,has_class_nums-1)
+            poison_poss.append(random_pos)
+            poison_targets.append(ranom_tar)
         else:
             poison_flags.append('clean')
             poison_poss.append(-1)
@@ -277,6 +279,20 @@ def main(args):
     
     
     final_local_train_datas,test_datas,poison_pairs,subset_realidx_list = inti_train_data(args) 
+    
+    # for id,(data,labels,tags) in enumerate(final_local_train_datas):
+    #     if len(tags)>0: 
+    #         img_ls = ['{}_{}'.format(labels[i],tags[i]) for i in range(len(labels))]
+    #     else :
+    #         img_ls = ['{}_0'.format(labels[i]) for i in range(len(labels))]
+    #     title = "{}_{}".format(id,str(len(tags)==0))
+    #     display_images_with_labels(data[:100],img_ls[:100],title,save_path='imgs/{}'.format(args.dataset))
+    
+    # for key in test_datas.keys():
+    #     data,labels = test_datas[key]
+    #     display_images_with_labels(data[:100],labels[:100],'test_'+key,save_path='imgs/{}'.format(args.dataset))   
+    
+    # return 
     t_c_data,t_c_labels = test_datas['clean']
     model,indices = init_big_model(args,t_c_data,t_c_labels)
     
@@ -433,20 +449,6 @@ def main(args):
     file_path = os.path.join(args.save_dir,'final.pth')
     print(file_path)
     torch.save(save_data,file_path)
-    
-    
-    # for id,(data,labels,tags) in enumerate(final_local_train_datas):
-    #     if len(tags)>0: 
-    #         img_ls = ['{}_{}'.format(labels[i],tags[i]) for i in range(len(labels))]
-    #     else :
-    #         img_ls = ['{}_0'.format(labels[i]) for i in range(len(labels))]
-    #     title = "{}_{}".format(id,str(len(tags)==0))
-    #     display_images_with_labels(data[:100],img_ls[:100],title)
-    
-    # for key in test_datas.keys():
-    #     data,labels = test_datas[key]
-    #     display_images_with_labels(data[:100],labels[:100],'test_'+key)   
-    
     
 if __name__ == '__main__':
     fuck_args = parse_option()

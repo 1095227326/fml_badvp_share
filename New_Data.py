@@ -75,7 +75,84 @@ def get_full_data(dataset_name):
         o_test_data = deepcopy(test_dataset.data)
         o_test_labels = deepcopy(test_dataset.targets)
         
+    elif dataset_name == 'imagenette':
+        batch_size = 100
+        data_dir = 'data/imagenette/'
+        # num_classes = 10
+        normalize = transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2770, 0.2691, 0.2821))
+        # transform_train = transforms.Compose(
+        #     [transforms.RandomResizedCrop(32), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+        #     normalize, ])
+        transform_test = transforms.Compose([transforms.Resize((32, 32)), transforms.ToTensor(),])
+        trainset = datasets.ImageFolder(root=os.path.join(data_dir, 'train'), transform=transform_test)
+        testset = datasets.ImageFolder(root=os.path.join(data_dir, 'val'), transform=transform_test)
+
+        class_names = trainset.classes
+        num_classes = len(class_names)
+
+    
+        train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers = 16, shuffle=True, pin_memory=True)
+        test_loader = torch.utils.data.DataLoader(testset, batch_size=batch_size, num_workers = 16, shuffle=False, pin_memory=True)
+       
+        o_train_data, o_train_labels,o_test_data, o_test_labels = [],[],[],[]
         
+        for img_p,labels in train_loader:
+            img_arr_copy = deepcopy(img_p.permute(0,2,3,1) * 255)
+            img_arr_copy = img_arr_copy.type(torch.uint8)
+            for img_arr in img_arr_copy:
+                o_train_data.append(deepcopy(img_arr))
+            o_train_labels.extend(labels.tolist())
+        o_train_data = np.stack(o_train_data)
+        
+        for img_p,labels in test_loader:
+            img_arr_copy = deepcopy(img_p.permute(0,2,3,1) * 255)
+            img_arr_copy = img_arr_copy.type(torch.uint8)
+            for img_arr in img_arr_copy:
+                o_test_data.append(deepcopy(img_arr))
+            o_test_labels.extend(labels.tolist())
+        o_test_data = np.stack(o_test_data)
+        
+    elif dataset_name == 'tiny_img':
+        batch_size = 100
+        data_dir = 'data/tiny-imagenet-200/'
+        # num_classes = 10
+        normalize = transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2770, 0.2691, 0.2821))
+        # transform_train = transforms.Compose(
+        #     [transforms.RandomResizedCrop(32), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+        #     normalize, ])
+        transform_test = transforms.Compose([transforms.Resize((32, 32)), transforms.ToTensor(),])
+        trainset = datasets.ImageFolder(root=os.path.join(data_dir, 'train'), transform=transform_test)
+        testset = datasets.ImageFolder(root=os.path.join(data_dir, 'val'), transform=transform_test)
+
+        class_names = trainset.classes
+        num_classes = len(class_names)
+
+    
+        train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers = 16, shuffle=True, pin_memory=True)
+        test_loader = torch.utils.data.DataLoader(testset, batch_size=batch_size, num_workers = 16, shuffle=False, pin_memory=True)
+       
+        o_train_data, o_train_labels,o_test_data, o_test_labels = [],[],[],[]
+        
+        for img_p,labels in train_loader:
+            img_arr_copy = deepcopy(img_p.permute(0,2,3,1) * 255)
+            img_arr_copy = img_arr_copy.type(torch.uint8)
+            for img_arr in img_arr_copy:
+                o_train_data.append(deepcopy(img_arr))
+            o_train_labels.extend(labels.tolist())
+        o_train_data = np.stack(o_train_data)
+        
+        for img_p,labels in test_loader:
+            img_arr_copy = deepcopy(img_p.permute(0,2,3,1) * 255)
+            img_arr_copy = img_arr_copy.type(torch.uint8)
+            for img_arr in img_arr_copy:
+                o_test_data.append(deepcopy(img_arr))
+            o_test_labels.extend(labels.tolist())
+        o_test_data = np.stack(o_test_data)
+    
+    
+    
+    
+    print(o_train_data.shape,o_test_data.shape)
     return o_train_data, o_train_labels,o_test_data, o_test_labels,class_names
 
 def divide_data_iid(len_label, num_clients):
@@ -194,12 +271,12 @@ if __name__ == '__main__':
     client_num = 100
     poison_client_num = 20
     alpha = 0.5
-    o_train_data, o_train_labels,o_test_data, o_test_labels,class_names = get_full_data('cifar10')
+    o_train_data, o_train_labels,o_test_data, o_test_labels,class_names = get_full_data('imagenette')
     print(len(o_train_labels),o_train_data.shape)
     print(len(o_test_labels),o_test_data.shape)
     print(len(class_names),class_names)
     subset_realidx_list = divide_data_iid(len(o_train_labels),client_num)
-    subset_realidx_list = divide_data_dirichlet(o_train_labels,10,client_num,alpha)
+    # subset_realidx_list = divide_data_dirichlet(o_train_labels,10,client_num,alpha)
     
     print(len(subset_realidx_list),type(len(subset_realidx_list),),len(subset_realidx_list[0]))
     clean_train_subdata_list,clean_train_sublabels_list = get_clean_train_subdata_list(o_train_data,o_train_labels,subset_realidx_list)
