@@ -419,6 +419,7 @@ def main(args):
                 global_acc = validate(indices, test_poison_loader, model,
                                 global_node.prompter, global_node.criterion, global_node.args)
             else:
+                # continue
                 global_asr = validate(indices, test_poison_loader, model,
                                 global_node.prompter, global_node.criterion, global_node.args)
 
