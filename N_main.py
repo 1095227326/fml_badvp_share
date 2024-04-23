@@ -83,7 +83,7 @@ def parse_option():
     parser.add_argument('--root', type=str, default='./data/cifar10',
                         help='dataset')
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        choices=['cifar10','caltech101','svhn','food101','imagenette','tiny_img'],
+                        choices=['cifar10','caltech101','svhn','food101','imagenette','tiny_img','eurosat','svhn'],
                         help='dataset')
     parser.add_argument('--image_size', type=int, default=224,
                         help='image size')

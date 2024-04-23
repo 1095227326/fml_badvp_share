@@ -141,7 +141,7 @@ def get_full_data(dataset_name):
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                 std=[0.229, 0.224, 0.225])
         ])
-        pickle_data_path = os.path.join('./data{}'.format(dataset_name),'eurosat.pickle')
+        pickle_data_path = os.path.join('./data/{}'.format(dataset_name),'eurosat.pickle')
        
         if os.path.exists(pickle_data_path):
             dataset = MyEuroSAT(pickle_data_path, transform)
@@ -157,11 +157,8 @@ def get_full_data(dataset_name):
         for i in range(len(dataset)):
             class_indices[dataset.targets[i]].append(i)
 
-        for i in range(num_classes):
-            print('The number of instances for class {}: {}'.format(i, len(class_indices[i])))
-
-        xx = np.random.seed(42)
-        random_seeds = xx.randint(1, 1000000, num_classes)
+        xx = np.random.default_rng(seed=42)
+        random_seeds = xx.integers(1, 1000000, num_classes)
 
         test_ratio = 0.2
         train_indices, test_indices = [], []
@@ -173,15 +170,21 @@ def get_full_data(dataset_name):
 
             test_indices.extend(class_indices[i][:num_test_class])
             train_indices.extend(class_indices[i][num_test_class:])
+      
+        o_train_data, o_train_labels,o_test_data, o_test_labels = [],[],[],[]
+        for i in range(len(dataset.targets)):
+            if i in train_indices:
+                o_train_data.append(np.array(dataset.data[i]))
+                o_train_labels.append(int(dataset.targets[i]))
+            else :
+                o_test_data.append(np.array(dataset.data[i]))
+                o_test_labels.append(int(dataset.targets[i]))
+        o_train_data = np.stack(o_train_data)
+        o_test_data = np.stack(o_test_data)
+        # print(o_train_data.shape)
+        class_names = dataset.classes
 
-        print('⏰⏰ Length of test_indices: {}, Length of train_indices: {}'.format(len(test_indices),len(train_indices)))
-        
-        train_dataset = torch.utils.data.Subset(dataset, train_indices)
-        test_dataset = torch.utils.data.Subset(dataset, test_indices)
-
-        classes = dataset.classes
-
-        return train_dataset, test_dataset, num_classes, classes
+       
     
     elif dataset_name == 'imagenette':
         batch_size = 100
