@@ -15,3 +15,5 @@ README.md
 .ipynb_checkpoints/Node-checkpoint.py
 jiaoben/prox_noiid_ins.sh
 jiaoben/prox_noiid_rn50
+test.py
+logs/test.log
