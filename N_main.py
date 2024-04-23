@@ -32,10 +32,6 @@ def parse_option():
                         help='mode for spilit')
     parser.add_argument('--alpha', type=float, default=0.5,
                         help='alpha of dirichlet')      
- 
-
-
-
     
     parser.add_argument('--save_dir', type=str, default='default',
                         help='pth_save_dir')
@@ -87,7 +83,7 @@ def parse_option():
     parser.add_argument('--root', type=str, default='./data/cifar10',
                         help='dataset')
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        choices=['cifar10','caltech101','svhn','food101','imagenette','tiny_img'],
+                        choices=['cifar10','caltech101','svhn','food101','imagenette','tiny_img','eurosat','svhn'],
                         help='dataset')
     parser.add_argument('--image_size', type=int, default=224,
                         help='image size')
@@ -423,6 +419,7 @@ def main(args):
                 global_acc = validate(indices, test_poison_loader, model,
                                 global_node.prompter, global_node.criterion, global_node.args)
             else:
+                # continue
                 global_asr = validate(indices, test_poison_loader, model,
                                 global_node.prompter, global_node.criterion, global_node.args)
 
