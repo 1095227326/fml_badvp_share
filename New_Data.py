@@ -74,7 +74,18 @@ def get_full_data(dataset_name):
         o_train_labels = deepcopy(dataset.targets)
         o_test_data = deepcopy(test_dataset.data)
         o_test_labels = deepcopy(test_dataset.targets)
-        
+    
+    if dataset_name == 'svhn':
+        _dataset = datasets.SVHN(root='./data/{}'.format(dataset_name), split='train', download=True)                                
+        _test_dataset = datasets.SVHN(root='./data/{}'.format(dataset_name), split='test', download=True)                                     
+        # img, target = self.data[index], int(self.labels[index])
+        class_names = [str(_) for _ in range(10)]
+        o_train_data = deepcopy(_dataset.data.transpose(0,2,3,1))
+        o_train_labels = deepcopy(_dataset.labels)
+        o_test_data = deepcopy(_test_dataset.data.transpose(0,2,3,1))
+        o_test_labels = deepcopy(_test_dataset.labels)
+        # print(type(o_train_data))
+        pass
     elif dataset_name == 'imagenette':
         batch_size = 100
         data_dir = 'data/imagenette/'
@@ -271,7 +282,7 @@ if __name__ == '__main__':
     client_num = 100
     poison_client_num = 20
     alpha = 0.5
-    o_train_data, o_train_labels,o_test_data, o_test_labels,class_names = get_full_data('imagenette')
+    o_train_data, o_train_labels,o_test_data, o_test_labels,class_names = get_full_data('svhn')
     print(len(o_train_labels),o_train_data.shape)
     print(len(o_test_labels),o_test_data.shape)
     print(len(class_names),class_names)

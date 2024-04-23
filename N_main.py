@@ -32,10 +32,6 @@ def parse_option():
                         help='mode for spilit')
     parser.add_argument('--alpha', type=float, default=0.5,
                         help='alpha of dirichlet')      
- 
-
-
-
     
     parser.add_argument('--save_dir', type=str, default='default',
                         help='pth_save_dir')
