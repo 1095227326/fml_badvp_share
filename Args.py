@@ -46,7 +46,7 @@ def parse_option():
                         help='optimizer to use')
     parser.add_argument('--learning_rate', type=float, default=40,
                         help='learning rate')
-    parser.add_argument('--server_learning_rate', type=float, default=1,
+    parser.add_argument('--server_learning_rate', type=float, default=0.1,
                         help='learning rate')
     parser.add_argument("--weight_decay", type=float, default=0,
                         help="weight decay")

@@ -444,6 +444,10 @@ class Global_node():
                                          momentum=args.momentum,
                                          weight_decay=args.weight_decay)
 
+        
+        self.gloptimizer = torch.optim.Adam(self.prompter.parameters(),
+                                          lr=args.server_learning_rate,
+                                          weight_decay=args.weight_decay)
         self.scheduler = cosine_lr(
             self.optimizer, args.learning_rate, args.warmup, total_steps)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
@@ -513,8 +517,8 @@ class Global_node():
                 param.grad = global_weights_grad[name]
                 
         # 使用服务器端优化器进行一步更新
-        self.optimizer.step()
-        self.optimizer.zero_grad()  # 准备下一轮的更新
+        self.gloptimizer.step()
+        self.gloptimizer.zero_grad()  # 准备下一轮的更新
         # self.scheduler.step()
         
         return
