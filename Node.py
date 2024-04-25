@@ -438,9 +438,11 @@ class Global_node():
 
         self.prompter = init_prompter(args)
         self.prompter.to(self.device)
-        self.optimizer = torch.optim.Adam(self.prompter.parameters(),
-                                          lr=args.server_learning_rate,
-                                          weight_decay=args.weight_decay)
+        
+        self.optimizer = torch.optim.SGD(self.prompter.parameters(),
+                                         lr=30,
+                                         momentum=args.momentum,
+                                         weight_decay=args.weight_decay)
 
         self.scheduler = cosine_lr(
             self.optimizer, args.learning_rate, args.warmup, total_steps)
