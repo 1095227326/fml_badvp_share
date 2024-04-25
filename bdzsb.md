@@ -1,1 +1,1 @@
-bzd is sb
+bzd is
