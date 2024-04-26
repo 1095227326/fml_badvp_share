@@ -321,7 +321,8 @@ def main(args):
 
     t_c_data,t_c_labels = test_datas['clean']
     model,indices = init_big_model(args,t_c_data,t_c_labels)
-    
+    # print(indices)
+    # return 
 
     total_steps = args.epochs
     one_node = Local_node2(0, args, total_steps)

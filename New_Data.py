@@ -16,8 +16,39 @@ import numpy as np
 from torch.utils.data import  Dataset, random_split
 from tqdm import tqdm
 import random
+from random import shuffle
+from collections import defaultdict
 poisondata_idxs_random = random.Random(42) 
 rng = np.random.default_rng(seed=42)
+
+def balance_data(data, labels, num_samples_per_class, num_classes=10):
+    # 按类别组织索引
+    class_indices = defaultdict(list)
+    for idx, label in enumerate(labels):
+        class_indices[label].append(idx)
+    
+    # 为每个类别选择指定数量的样本
+    balanced_indices = []
+    for i in range(num_classes):
+        shuffle(class_indices[i])  # 打乱顺序增加随机性
+        
+        # 检查该类别的样本数量是否足够
+        num_samples_in_class = len(class_indices[i])
+        if num_samples_in_class < num_samples_per_class:
+            # 如果样本数量不足，则重复采样直到达到所需数量
+            needed_samples = num_samples_per_class - num_samples_in_class
+            repeated_indices = class_indices[i] * (needed_samples // num_samples_in_class + 1)
+            shuffle(repeated_indices)
+            balanced_indices.extend(class_indices[i] + repeated_indices[:needed_samples])
+        else:
+            # 如果样本数量足够，则直接选择所需数量的样本
+            balanced_indices.extend(class_indices[i][:num_samples_per_class])
+
+    # 使用选中的索引创建新的数据集和标签列表
+    balanced_data = data[balanced_indices]
+    balanced_labels = [labels[i] for i in balanced_indices]
+
+    return balanced_data, balanced_labels
 
 def save_image_data(save_path, origin_data, depth=0):
     data_str = 'origin_data'
@@ -130,6 +161,10 @@ def get_full_data(dataset_name):
         o_train_labels = deepcopy(_dataset.labels)
         o_test_data = deepcopy(_test_dataset.data.transpose(0,2,3,1))
         o_test_labels = deepcopy(_test_dataset.labels)
+        # print(len(o_train_data))
+        o_train_data,o_train_labels = balance_data(o_train_data,o_train_labels ,5000,10)
+        o_test_data, o_test_labels  = balance_data(o_test_data, o_test_labels,1000,10)
+        print(len(o_train_labels),len(o_test_labels))
         # print(type(o_train_data))
         pass
     
@@ -382,7 +417,7 @@ if __name__ == '__main__':
     client_num = 100
     poison_client_num = 20
     alpha = 0.5
-    o_train_data, o_train_labels,o_test_data, o_test_labels,class_names = get_full_data('eurosat')
+    o_train_data, o_train_labels,o_test_data, o_test_labels,class_names = get_full_data('svhn')
     print(len(o_train_labels),o_train_data.shape)
     print(len(o_test_labels),o_test_data.shape)
     print(len(class_names),class_names)
