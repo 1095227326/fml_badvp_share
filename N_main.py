@@ -125,7 +125,7 @@ def parse_option():
     t_merge_mode = args.merge_mode
     
     t_model = args.model    
-    t_trigger_pos = 'random '
+    t_trigger_pos = 'random'
     t_fmltag = 'fml' if args.isfml else 'notfml'
 
     
