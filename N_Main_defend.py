@@ -1,0 +1,448 @@
+from Node import Global_node, Local_node2, init_model, train_merge, train_clean, validate, init_prompter
+from Utils import get_map_indices
+import New_Data
+from copy import deepcopy
+from torch.utils.data import DataLoader
+import time
+import torch,os
+import random
+import matplotlib.pyplot as plt
+import numpy as np
+
+import argparse
+import timm
+from models import prompters
+from Model import vit
+from torchvision.models.resnet import resnet50,ResNet50_Weights
+
+import seaborn as sns
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy.spatial.distance import pdist, squareform
+from sklearn.cluster import AgglomerativeClustering
+
+choice_randomer = np.random.default_rng(seed=42)
+save_data = {}
+def vis_prompter(args,node_list):
+    device = args.device
+    black_image = torch.zeros([1, 3, 224, 224], device=device)
+    
+    fig, axes = plt.subplots(10, 10, figsize=(15, 15))
+    fig.suptitle("100 PadPrompter Outputs", fontsize=16)
+
+    for i, ax in enumerate(axes.flatten()):
+        # 应用PadPrompter
+        result_image = node_list[i].prompter(black_image)
+        # 转换图像为可绘制的格式
+        image = result_image.cpu().detach().squeeze().permute(1, 2, 0).numpy()
+        # 标准化图像到[0, 1]
+        image = (image - image.min()) / (image.max() - image.min())
+        ax.imshow(image)
+        ax.axis('off')  # 不显示坐标轴
+        ax.set_title(f"Prompter {i+1}")
+
+    # 调整子图间距，留出空间显示标题
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    fig.savefig('pad_prompter_grid.png')
+
+def set_padding_params(prompter, value):
+    with torch.no_grad():
+        prompter.pad_up.fill_(value)
+        prompter.pad_down.fill_(value)
+        prompter.pad_left.fill_(value)
+        prompter.pad_right.fill_(value)
+
+def train_one_round(indices,model,final_local_train_datas,node_list,default_dict,args):
+    for node_id in range(len(node_list)):
+        node_list[node_id].init_from_dict(
+            default_dict)  # 给本轮选中的客户端赋予server模型
+    p_dict_list= []
+    ans_list = []
+    num_workers = args.num_workers
+    batch_size = args.batch_size
+    for node_id in range(10):
+        local_data,local_lables,local_tags = deepcopy(final_local_train_datas[node_id])
+        # 初始化当前node
+        is_poison = True if len(local_tags) != 0 else False
+        # node prompter 初始化
+        node_list[node_id].init_from_dict(
+            default_dict)  # 给本轮选中的客户端赋予server模型
+        now_node: Local_node2 = node_list[node_id]
+
+        train_dataset = New_Data.CustomDataset(local_data,local_lables,local_tags)
+        train_loader = DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=num_workers,pin_memory=True)
+        
+        
+        global_prompter_current = deepcopy(now_node.prompter)
+
+
+        for now_epoch in range(args.epochs):
+            # 用于调整学习率
+            args.now_step =  now_epoch
+
+            # 加载上次的客户端模型，作moon的对比学习用
+            prev_checkpoint = now_node.load_checkpoint() ## TODO 记得修改路径问题，存储路径为args.save_dir
+            if prev_checkpoint is not None:
+                # 检查点加载成功，可以继续使用 prev_checkpoint
+                prev_state_dict = prev_checkpoint['state_dict']
+                prev_prompt = init_prompter(args)
+                prev_prompt.load_state_dict(prev_state_dict)
+            else:
+                prev_prompt = init_prompter(args)
+
+            # poison 和clean 分开训练
+            if is_poison:
+                loss, top1 = train_merge(indices, train_loader, model, prev_prompt, global_prompter_current, now_node.prompter, now_node.optimizer,
+                                            now_node.scheduler, now_node.criterion, now_node.epoch + 1, now_node.args)
+            else:
+                loss, top1 = train_clean(indices, train_loader, model, prev_prompt, global_prompter_current, now_node.prompter, now_node.optimizer,
+                                            now_node.scheduler, now_node.criterion, now_node.epoch + 1, now_node.args)
+            # loss = 1.0
+            if is_poison:
+                desc = 'Detect Stage  Node_{} Poison Epoch {} Loss is {:4.5f}'
+            else:
+                desc = 'Detect Stage  Node_{} Clean  Epoch {} Loss is {:4.5f}'
+            print(desc.format(node_id, now_epoch + 1, loss))
+        
+        p_dict_list.append(deepcopy(now_node.prompter.state_dict()))
+        ans_list.append(1 if is_poison else 0)
+    # detect_poison(p_dict_list)      
+    # print("correct labels:", np.array(ans_list)) 
+    # vis_prompter(args,node_list)
+    
+    return p_dict_list    
+
+def state_dict2nparr(p):
+    numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
+    t_arr = []
+    for key, value in numpy_state_dict.items():
+        t_arr.append(value.flatten())
+        # print(f"Key: {key}, Shape: {value.flatten().shape}")
+    t_arr = np.concatenate(t_arr)
+   
+    print(len(t_arr))
+    return t_arr
+
+def detect_poison(will_merge_prompter_list):
+    p_arr = []
+    for p in will_merge_prompter_list:
+       
+        t_arr = []
+        numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
+        for key, value in numpy_state_dict.items():
+            t_arr.append(value.flatten())
+            # print(f"Key: {key}, Shape: {value.flatten().shape}")
+        t_arr = np.concatenate(t_arr)
+        # print(t_arr.shape)
+        p_arr.append(t_arr)
+    print(len(p_arr),p_arr[0].shape)
+
+
+
+    stacked_arrays = np.vstack(p_arr)
+
+    # 计算余弦距离矩阵
+    cosine_distances = squareform(pdist(stacked_arrays, metric='cosine')) * 100.0
+    clustering = AgglomerativeClustering(n_clusters=2, metric='precomputed', linkage='complete')
+    cluster_labels = clustering.fit_predict(cosine_distances)
+
+    # 输出聚类结果
+    print("Cluster labels:", cluster_labels)
+    
+def parse_option():
+    parser = argparse.ArgumentParser('N_main')
+    
+    parser.add_argument('--round', type=int, default=50,
+                        help='round')
+    parser.add_argument('--select_num', type=int, default=10,
+                        help='client num for each round')
+    parser.add_argument('--client_num', type=int, default=100,
+                        help='all client num')
+    parser.add_argument('--poison_client_num', type=int, default=20,
+                        help='poison_client_num')   
+    parser.add_argument('--spilit_mode', type=str, default='iid',
+                        help='mode for spilit')
+    parser.add_argument('--alpha', type=float, default=0.5,
+                        help='alpha of dirichlet')      
+    
+    parser.add_argument('--save_dir', type=str, default='default',
+                        help='pth_save_dir')
+    
+    parser.add_argument('--batch_size', type=int, default=32,
+                        help='batch_size')
+    parser.add_argument('--num_workers', type=int, default=32,
+                        help='num of workers to use')
+    parser.add_argument('--epochs', type=int, default=5,
+                        help='number of training epoch5s')
+    parser.add_argument('--device', type=str, default= 'cuda:0',
+                        help='gpu')
+    parser.add_argument('--tqdm', default=True,
+                    help='whether the tqdm is displayed')
+    parser.add_argument('--isfml', default=True,
+                    help='whether the tqdm is displayed')
+
+
+    # optimization
+    parser.add_argument('--learning_rate', type=float, default=40,
+                        help='learning rate')
+    parser.add_argument('--server_learning_rate', type=float, default=1,
+                        help='learning rate')
+    parser.add_argument("--weight_decay", type=float, default=0,
+                        help="weight decay")
+    parser.add_argument("--warmup", type=int, default=10,
+                        help="number of steps to warmup for")
+    parser.add_argument('--momentum', type=float, default=0.9,
+                        help='momentum')
+    
+
+    # model
+    parser.add_argument('--model', type=str, default='rn50',
+                        choices=['rn50', 'instagram_resnext101_32x8d', 'bit_m_rn50','vit'],
+                        help='choose pre-trained model')
+
+    parser.add_argument('--method', type=str, default='padding',
+                        choices=['padding', 'random_patch', 'fixed_patch', 'stripe_padding'],
+                        help='choose visual prompting method')
+    parser.add_argument('--prompt_size', type=int, default=30,
+                        help='size for visual prompts')
+    parser.add_argument('--freq_map', default=False,
+                        action="store_true",
+                        help='whether to use the frequency of the original labels to map the downstream labels')
+    parser.add_argument('--merge_mode', type=str, default='avg',
+                        choices=['avg','moon','prox','opt'],
+                        help='methods of aggregation')
+    # dataset
+    parser.add_argument('--root', type=str, default='./data/cifar10',
+                        help='dataset')
+    parser.add_argument('--dataset', type=str, default='cifar10',
+                        choices=['cifar10','caltech101','svhn','food101','imagenette','tiny_img','eurosat','svhn'],
+                        help='dataset')
+    parser.add_argument('--image_size', type=int, default=224,
+                        help='image size')
+
+    parser.add_argument('--target_class', type=int, default= 1,
+                        help='Target class(es) for the backdoor attacks')
+    parser.add_argument('--poison_ratio', type=float, default=0.05,
+                        help='The proportion of the inserted poisoned data')
+    parser.add_argument('--trigger_size', type=tuple, default=4,
+                        help='Trigger size')
+    parser.add_argument('--trigger_pos', type=str, default='br',
+                        help='The position of the trigger')
+
+
+    parser.add_argument('--lmbda', type=float, default=1.0,
+                        help='The coefficient to balance the model utility and attack effectiveness.')
+
+    parser.add_argument('--mu', type=float, default=0.01, help='proximal term constant')
+    parser.add_argument('--nu', type=float, default=0.001, help='moon term constant')
+    parser.add_argument('--temperature', type=float, default=0.5, help='the temperature parameter for contrastive loss')
+
+
+
+    args = parser.parse_args()
+    args.gpu = int(args.device[-1])
+    
+    
+    t_save_path = './save/test_juzhen_fully_random_{}_{}_{}_{}_{}_{}'
+    
+    t_dataset = args.dataset
+    
+    t_spilit = ''
+    if args.spilit_mode == 'iid':
+        t_spilit = 'iid'
+        pass
+    elif args.spilit_mode == 'noiid':
+        t_spilit = 'noiid_{}'.format(args.alpha)
+        
+    t_merge_mode = args.merge_mode
+    
+    t_model = args.model    
+    t_trigger_pos = 'random'
+    t_fmltag = 'fml' if args.isfml else 'notfml'
+
+    
+    t_save_path = t_save_path.format(t_dataset,t_spilit,t_merge_mode,t_model,t_trigger_pos,t_fmltag)
+    
+
+    t_path = t_save_path
+    print('Save_Path Is \n{}'.format(t_path))
+   
+    if os.path.exists(t_path)  :
+        if  not os.listdir(t_path) == []:
+            print('Save Dir Error !')
+            exit()
+    else :
+        os.makedirs(t_path)
+    args.save_dir = t_path
+
+    return args
+
+def display_images_with_labels(images, labels, title="Image Grid", save=True, save_path='imgs'):
+    if len(images) != len(labels):
+        raise ValueError("图像和标签的数量必须匹配")
+    
+    plt.figure(figsize=(20, 20))
+    plt.suptitle(title, fontsize=16)
+    
+    for i in range(100):  # 100 because the layout is 10x10
+        ax = plt.subplot(10, 10, i + 1)
+        if i < len(images):
+            # 检查是否需要转置操作
+            image = images[i].transpose(1, 2, 0) if images[i].shape[0] == 3 else images[i]
+            ax.imshow(image)
+            ax.set_title(labels[i])
+        ax.axis('off')  # Always turn off axis, regardless if there is an image or not
+    
+    if save:
+        plt.savefig(os.path.join(save_path,title))
+    plt.show()
+    plt.close()  # Close the figure to free memory
+        
+
+def inti_train_data(args):
+    poison_node_randomer = random.Random(42) 
+    
+    dataset = args.dataset
+    client_num = args.client_num
+    spilit_mode = args.spilit_mode
+    alpha = args.alpha
+    poison_client_num = args.poison_client_num
+    poison_ratio = args.poison_ratio
+    trigger_size = args.trigger_size
+    trigger_pos = args.trigger_pos
+    target_class = args.target_class
+    o_train_data, o_train_labels,o_test_data, o_test_labels,class_names = New_Data.get_full_data(dataset)
+    if spilit_mode == 'iid':
+        subset_realidx_list = New_Data.divide_data_iid(len(o_train_labels),client_num)
+
+    else :
+        subset_realidx_list = New_Data.divide_data_dirichlet(o_train_labels,10,client_num,alpha)
+
+    clean_train_subdata_list,clean_train_sublabels_list = New_Data.get_clean_train_subdata_list(o_train_data,o_train_labels,subset_realidx_list)
+
+    
+    poison_node_idxs = poison_node_randomer.sample(range(0, client_num), int(poison_client_num))
+    possiable_pos = ['bl','tl','br','tr','tc','bc','lc','rc','c',]
+
+    poison_flags = [] 
+    poison_poss = [] 
+    poison_targets = []
+
+    for id in range(client_num):
+        has_class_nums = len(set(clean_train_sublabels_list[id]))
+       
+        if id in poison_node_idxs:
+            poison_flags.append('poison')
+            random_pos = possiable_pos[poison_node_randomer.randint(0,7)]
+            ranom_tar = poison_node_randomer.randint(0,has_class_nums-1)
+            # TODO 修改此处随机方式
+            poison_poss.append('br')
+            poison_targets.append(1)
+        else:
+            poison_flags.append('clean')
+            poison_poss.append(-1)
+            poison_targets.append(-1)
+            
+    print(len(poison_poss))
+    print(len(poison_targets))    
+    
+    final_local_train_datas = []
+    for id,(data,labels) in enumerate(zip(clean_train_subdata_list,clean_train_sublabels_list)):
+        
+        trigger_pos = poison_poss[id]
+        target_class = poison_targets[id]
+        print(id,target_class,trigger_pos,type(data),data.shape,len(labels),labels[:6])
+        if id in poison_node_idxs:
+            data,labels,tags = New_Data.process_data(data,labels,poison_ratio,trigger_pos,trigger_size,target_class)
+        else :
+            tags = []
+        final_local_train_datas.append(deepcopy((data,labels,tags)))
+        
+    poison_pairs = []
+    for pos,tar in zip(poison_poss,poison_targets):
+        if pos != -1 and tar != -1:
+            poison_pairs.append((pos,tar))
+    unique_poison_pairs = deepcopy(list(set(poison_pairs)))
+    print(unique_poison_pairs)
+    
+
+    
+    test_datas ={'clean':(deepcopy(o_test_data),deepcopy(o_test_labels))}
+    for pos,tar in unique_poison_pairs:
+        test_tag = '{}_{}'.format(pos,tar)
+        data =deepcopy(o_test_data)
+        labels = deepcopy(o_test_labels)
+        data,labels,tags = New_Data.process_data(data, labels,1,pos,trigger_size,tar)
+        
+        test_datas[test_tag] = (deepcopy(data),deepcopy(labels))
+        
+    poison_pairs = []
+    for pos,tar in zip(poison_poss,poison_targets):
+        poison_pairs.append((pos,tar))     
+            
+    return final_local_train_datas,test_datas,poison_pairs,subset_realidx_list
+
+def init_big_model(args,data,labels):
+    device = args.device
+    model = None
+    if args.model == 'rn50':
+        model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1).to(device)
+    elif args.model == 'vit':
+        model = vit().to(device)
+        
+    elif args.model == 'instagram_resnext101_32x8d':
+        model = torch.hub.load('facebookresearch/WSL-Images', 'resnext101_32x8d_wsl').to(device)
+    elif args.model == 'bit_m_rn50':
+        model = timm.create_model('resnetv2_50x1_bitm_in21k', pretrained=True).to(device)
+    model.eval()
+    print(labels[:10])
+    test_clean_dataset = New_Data.CustomDataset(data,labels)
+    loader = DataLoader(test_clean_dataset,32,False,num_workers=16)
+    indices = get_map_indices(model,loader,len(set(labels)),device)
+
+    return model,indices
+        
+def main(args):
+    
+    print(args)
+    
+    
+    final_local_train_datas,test_datas,poison_pairs,subset_realidx_list = inti_train_data(args) 
+    
+    t_c_data,t_c_labels = test_datas['clean']
+    model,indices = init_big_model(args,t_c_data,t_c_labels)
+    
+    node_list = []
+    for i in range(args.client_num):
+        total_steps = args.round * args.epochs
+        temp_node = Local_node2(i, args, total_steps)
+        node_list.append(temp_node)
+        
+    global_node = Global_node(args, 10)
+    
+    num_workers = args.num_workers
+    batch_size = args.batch_size
+    
+    set_padding_params(global_node.prompter,1)
+   
+   
+    o_promp_arr = deepcopy(state_dict2nparr(global_node.prompter.state_dict()))
+    print('tarr',o_promp_arr)
+    vis_prompter(args,node_list)
+    # mark_poison_nodes(indices,model,final_local_train_datas,node_list,deepcopy(global_node.prompter.state_dict()),args)
+    
+    trainend_dict_list = train_one_round(indices,model,final_local_train_datas,node_list,deepcopy(global_node.prompter.state_dict()),args)
+    train_arr_list = [state_dict2nparr(t_p) for t_p in trainend_dict_list]
+    
+    diff_arr = np.stack([arr_p - o_promp_arr for arr_p in train_arr_list])
+    np.save('diff_arr.npy', diff_arr)
+    print(diff_arr.shape)
+    for arr in train_arr_list:
+        print(type(arr))
+        print(arr)
+        break
+    
+    
+if __name__ == '__main__':
+    fuck_args = parse_option()
+    main(fuck_args)
+    pass
