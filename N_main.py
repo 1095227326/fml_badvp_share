@@ -111,7 +111,7 @@ def parse_option():
     args.gpu = int(args.device[-1])
     
     
-    t_save_path = './save/fully_random_{}_{}_{}_{}_{}_{}'
+    t_save_path = './save/no_random_{}_{}_{}_{}_{}_{}_{}'
     
     t_dataset = args.dataset
     
@@ -127,9 +127,9 @@ def parse_option():
     t_model = args.model    
     t_trigger_pos = 'random'
     t_fmltag = 'fml' if args.isfml else 'notfml'
-
+    t_client_nums= str(args.poison_client_num)
     
-    t_save_path = t_save_path.format(t_dataset,t_spilit,t_merge_mode,t_model,t_trigger_pos,t_fmltag)
+    t_save_path = t_save_path.format(t_dataset,t_spilit,t_merge_mode,t_model,t_trigger_pos,t_fmltag,t_client_nums)
     
 
     t_path = t_save_path
@@ -203,8 +203,8 @@ def inti_train_data(args):
             poison_flags.append('poison')
             random_pos = possiable_pos[poison_node_randomer.randint(0,7)]
             ranom_tar = poison_node_randomer.randint(0,has_class_nums-1)
-            poison_poss.append(random_pos)
-            poison_targets.append(ranom_tar)
+            poison_poss.append('br')
+            poison_targets.append(1)
         else:
             poison_flags.append('clean')
             poison_poss.append(-1)

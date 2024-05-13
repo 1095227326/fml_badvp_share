@@ -653,12 +653,27 @@ def add_trigger(img, trigger, trigger_size=4, trigger_pos='l'):
     elif trigger_pos == 'r':  # 右下角
         pos = (image_shape[0] - trigger_size[0],
                image_shape[1] - trigger_size[1])
+    elif trigger_pos == 'bl':  # 左下角
+        pos = (image_shape[0] - trigger_size[0], 0)
+    elif trigger_pos == 'tl':  # 左上角
+        pos = (0, 0)
+    elif trigger_pos == 'br':  # 右下角
+        pos = (image_shape[0] - trigger_size[0], image_shape[1] - trigger_size[1])
+    elif trigger_pos == 'tr':  # 右上角
+        pos = (0, image_shape[1] - trigger_size[1])
+    elif trigger_pos == 'tc':  # 顶部中心
+        pos = (0, (image_shape[1] - trigger_size[1]) // 2)
+    elif trigger_pos == 'bc':  # 底部中心
+        pos = (image_shape[0] - trigger_size[0], (image_shape[1] - trigger_size[1]) // 2)
+    elif trigger_pos == 'lc':  # 左侧中心
+        pos = ((image_shape[0] - trigger_size[0]) // 2, 0)
+    elif trigger_pos == 'rc':  # 右侧中心
+        pos = ((image_shape[0] - trigger_size[0]) // 2, image_shape[1] - trigger_size[1])
     elif trigger_pos == 'c':  # 正中心
-        pos = (image_shape[0]//2 - trigger_size[0]//2,
-               image_shape[1]//2 - trigger_size[1]//2)
+        pos = (image_shape[0]//2 - trigger_size[0]//2, image_shape[1]//2 - trigger_size[1]//2)
     else:
         print(trigger_pos)
-        raise ValueError("Invalid trigger position. Use 'l', 'm', or 'r'.")
+        raise ValueError("Invalid trigger position")
     # print(pos)
     modified_image = np.copy(img)  # 创建图像的副本以避免修改原始图像
     trigger_height, trigger_width, _ = trigger.shape
