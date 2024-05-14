@@ -22,6 +22,7 @@ from sklearn.cluster import AgglomerativeClustering
 
 choice_randomer = np.random.default_rng(seed=42)
 save_data = {}
+
 def vis_prompter(args,node_list):
     device = args.device
     black_image = torch.zeros([1, 3, 224, 224], device=device)
@@ -51,7 +52,7 @@ def set_padding_params(prompter, value):
         prompter.pad_left.fill_(value)
         prompter.pad_right.fill_(value)
 
-def train_one_round(indices,model,final_local_train_datas,node_list,default_dict,args):
+def train_one_round(indices,model,final_local_train_datas,node_list,default_dict,args,round = 1):
     for node_id in range(len(node_list)):
         node_list[node_id].init_from_dict(
             default_dict)  # 给本轮选中的客户端赋予server模型
@@ -59,7 +60,7 @@ def train_one_round(indices,model,final_local_train_datas,node_list,default_dict
     ans_list = []
     num_workers = args.num_workers
     batch_size = args.batch_size
-    for node_id in range(10):
+    for node_id in range(100):
         local_data,local_lables,local_tags = deepcopy(final_local_train_datas[node_id])
         # 初始化当前node
         is_poison = True if len(local_tags) != 0 else False
@@ -75,9 +76,9 @@ def train_one_round(indices,model,final_local_train_datas,node_list,default_dict
         global_prompter_current = deepcopy(now_node.prompter)
 
 
-        for now_epoch in range(args.epochs):
+        for now_epoch in range(5):
             # 用于调整学习率
-            args.now_step =  now_epoch
+            args.now_step = now_epoch
 
             # 加载上次的客户端模型，作moon的对比学习用
             prev_checkpoint = now_node.load_checkpoint() ## TODO 记得修改路径问题，存储路径为args.save_dir
@@ -109,7 +110,7 @@ def train_one_round(indices,model,final_local_train_datas,node_list,default_dict
     # print("correct labels:", np.array(ans_list)) 
     # vis_prompter(args,node_list)
     
-    return p_dict_list    
+    return p_dict_list,ans_list    
 
 def state_dict2nparr(p):
     numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
@@ -122,19 +123,19 @@ def state_dict2nparr(p):
     print(len(t_arr))
     return t_arr
 
-def detect_poison(will_merge_prompter_list):
-    p_arr = []
-    for p in will_merge_prompter_list:
+def detect_poison(p_arr):
+    # p_arr = []
+    # for p in will_merge_prompter_list:
        
-        t_arr = []
-        numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
-        for key, value in numpy_state_dict.items():
-            t_arr.append(value.flatten())
-            # print(f"Key: {key}, Shape: {value.flatten().shape}")
-        t_arr = np.concatenate(t_arr)
-        # print(t_arr.shape)
-        p_arr.append(t_arr)
-    print(len(p_arr),p_arr[0].shape)
+    #     t_arr = []
+    #     numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
+    #     for key, value in numpy_state_dict.items():
+    #         t_arr.append(value.flatten())
+    #         # print(f"Key: {key}, Shape: {value.flatten().shape}")
+    #     t_arr = np.concatenate(t_arr)
+    #     # print(t_arr.shape)
+    #     p_arr.append(t_arr)
+    # print(len(p_arr),p_arr[0].shape)
 
 
 
@@ -146,7 +147,15 @@ def detect_poison(will_merge_prompter_list):
     cluster_labels = clustering.fit_predict(cosine_distances)
 
     # 输出聚类结果
-    print("Cluster labels:", cluster_labels)
+   
+    label_counts = np.bincount(cluster_labels)
+    majority_label = np.argmax(label_counts)
+    minority_label = 1 - majority_label
+
+    # 重置cluster_labels
+    new_cluster_labels = np.where(cluster_labels == majority_label, 0, 1)
+    print("Cluster labels:", new_cluster_labels)
+    return new_cluster_labels
     
 def parse_option():
     parser = argparse.ArgumentParser('N_main')
@@ -242,7 +251,7 @@ def parse_option():
     args.gpu = int(args.device[-1])
     
     
-    t_save_path = './save/test_juzhen_fully_random_{}_{}_{}_{}_{}_{}'
+    t_save_path = './save/juzhen_defend_fully_random_{}_{}_{}_{}_{}_{}_{}'
     
     t_dataset = args.dataset
     
@@ -258,9 +267,9 @@ def parse_option():
     t_model = args.model    
     t_trigger_pos = 'random'
     t_fmltag = 'fml' if args.isfml else 'notfml'
-
+    t_num = args.poison_client_num
     
-    t_save_path = t_save_path.format(t_dataset,t_spilit,t_merge_mode,t_model,t_trigger_pos,t_fmltag)
+    t_save_path = t_save_path.format(t_dataset,t_spilit,t_merge_mode,t_model,t_trigger_pos,t_num,t_fmltag)
     
 
     t_path = t_save_path
@@ -335,8 +344,8 @@ def inti_train_data(args):
             random_pos = possiable_pos[poison_node_randomer.randint(0,7)]
             ranom_tar = poison_node_randomer.randint(0,has_class_nums-1)
             # TODO 修改此处随机方式
-            poison_poss.append('br')
-            poison_targets.append(1)
+            poison_poss.append(random_pos)
+            poison_targets.append(ranom_tar)
         else:
             poison_flags.append('clean')
             poison_poss.append(-1)
@@ -422,24 +431,168 @@ def main(args):
     num_workers = args.num_workers
     batch_size = args.batch_size
     
-    set_padding_params(global_node.prompter,1)
+    # set_padding_params(global_node.prompter,1)
    
    
-    o_promp_arr = deepcopy(state_dict2nparr(global_node.prompter.state_dict()))
-    print('tarr',o_promp_arr)
-    vis_prompter(args,node_list)
+    # o_promp_arr = deepcopy(state_dict2nparr(global_node.prompter.state_dict()))
+    # print('tarr',o_promp_arr)
+    # vis_prompter(args,node_list)
     # mark_poison_nodes(indices,model,final_local_train_datas,node_list,deepcopy(global_node.prompter.state_dict()),args)
     
-    trainend_dict_list = train_one_round(indices,model,final_local_train_datas,node_list,deepcopy(global_node.prompter.state_dict()),args)
+    trainend_dict_list,ans_list = train_one_round(indices,model,final_local_train_datas,node_list,deepcopy(global_node.prompter.state_dict()),args)
     train_arr_list = [state_dict2nparr(t_p) for t_p in trainend_dict_list]
     
-    diff_arr = np.stack([arr_p - o_promp_arr for arr_p in train_arr_list])
-    np.save('diff_arr.npy', diff_arr)
-    print(diff_arr.shape)
-    for arr in train_arr_list:
-        print(type(arr))
-        print(arr)
-        break
+    node_poison_lables = detect_poison(train_arr_list)
+    for i in range(100):
+        print(ans_list[i] - node_poison_lables[i],end = ' ')
+    for i in range(args.round):
+        # start_time = time.time()
+        # 选取select_num 数量的client 不重复
+        select_idx = choice_randomer.choice(
+            range(0, args.client_num), args.select_num, replace=False)
+        print('Round {}/{} the selected nodes is '.format(i+1, args.round), select_idx)
+
+        will_merge_prompter_list = []
+        select_idx_list = []  # 记录选的是哪几个客户端，因为客户端权重跟其样本数量有关
+        for node_id in select_idx:
+            if node_poison_lables[node_id] == 1:
+                continue
+            local_data,local_lables,local_tags = deepcopy(final_local_train_datas[node_id])
+            # 初始化当前node
+            is_poison = True if len(local_tags) != 0 else False
+            # node prompter 初始化
+            node_list[node_id].init_from_dict(
+                global_node.prompter.state_dict())  # 给本轮选中的客户端赋予server模型
+            now_node: Local_node2 = node_list[node_id]
+
+            train_dataset = New_Data.CustomDataset(local_data,local_lables,local_tags)
+            train_loader = DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=num_workers,pin_memory=True)
+            
+            local_clean_testdata,local_clean_test_labels = deepcopy(test_datas['clean'])
+            test_clean_dataset = New_Data.CustomDataset(local_clean_testdata,local_clean_test_labels)
+            test_clean_loader = DataLoader(test_clean_dataset,batch_size=batch_size,shuffle=False,num_workers=num_workers,pin_memory=True)
+            
+            t_pos,t_tar = poison_pairs[node_id]
+            if is_poison:
+                local_poison_testdata,local_poison_test_labels = deepcopy(test_datas['{}_{}'.format(t_pos,t_tar)])
+                test_poison_dataset = New_Data.CustomDataset(local_poison_testdata,local_poison_test_labels)
+                test_poison_loader = DataLoader(test_poison_dataset,batch_size=batch_size,shuffle=False,num_workers=num_workers,pin_memory=True)
+
+            print('Node_{:3d} Data Prepared | train  {:<4d} test  {:<4d} '.format(
+                node_id, len(train_loader),len(test_clean_loader)))
+        
+            global_prompter_current = deepcopy(now_node.prompter)
+    
+
+            for now_epoch in range(args.epochs):
+                # 用于调整学习率
+                args.now_step = i*args.epochs + now_epoch
+
+                # 加载上次的客户端模型，作moon的对比学习用
+                prev_checkpoint = now_node.load_checkpoint() ## TODO 记得修改路径问题，存储路径为args.save_dir
+                if prev_checkpoint is not None:
+                    # 检查点加载成功，可以继续使用 prev_checkpoint
+                    prev_state_dict = prev_checkpoint['state_dict']
+                    prev_prompt = init_prompter(args)
+                    prev_prompt.load_state_dict(prev_state_dict)
+                else:
+                    prev_prompt = init_prompter(args)
+
+                # poison 和clean 分开训练
+                if is_poison:
+                    loss, top1 = train_merge(indices, train_loader, model, prev_prompt, global_prompter_current, now_node.prompter, now_node.optimizer,
+                                             now_node.scheduler, now_node.criterion, now_node.epoch + 1, now_node.args)
+                else:
+                    loss, top1 = train_clean(indices, train_loader, model, prev_prompt, global_prompter_current, now_node.prompter, now_node.optimizer,
+                                             now_node.scheduler, now_node.criterion, now_node.epoch + 1, now_node.args)
+                # loss = 1.0
+                if is_poison:
+                    desc = 'Round {}/{} Node_{} Poison Epoch {} Loss is {:4.5f}'
+                else:
+                    desc = 'Round {}/{} Node_{} Clean  Epoch {} Loss is {:4.5f}'
+                print(desc.format(i+1, args.round, node_id, now_epoch + 1, loss))
+
+            acc,asr = -10,-10
+            
+            acc = validate(indices, test_clean_loader, model,
+                           now_node.prompter, now_node.criterion, now_node.args)
+           
+            if is_poison:
+                pass
+                asr = validate(indices, test_poison_loader, model,
+                            now_node.prompter, now_node.criterion, now_node.args)
+            
+            t_save_data = {'node_id':node_id,'acc':acc,'asr':asr,'round':i+1,
+                           'dict':now_node.prompter.state_dict(),'ispoison':is_poison,
+                           'trigger_pos':t_pos,'target_class':t_tar}
+            
+            number_of_elements = len(save_data)
+            save_data[str(number_of_elements)] =deepcopy(t_save_data)
+            
+            now_node.acc = acc
+            now_node.asr = asr
+            if acc > now_node.best_acc:
+                now_node.best_acc = acc
+                now_node.best_asr = asr
+                  
+            if is_poison:
+                desc = 'Round {}/{} Node_{} Poison_{}_{}  Acc is {:5.2f} Asr is {:5.2f} '
+                print(desc.format(i+1, args.round, node_id,t_pos,t_tar, acc, asr))
+            else:
+                desc = 'Round {}/{} Node_{} Clean         Acc is {:5.2f} '
+                print(desc.format(i+1, args.round, node_id, acc, asr))            
+        
+            node_list[node_id] = now_node 
+            select_idx_list.append(node_id)
+            will_merge_prompter_list.append(now_node.prompter)  # 还是只聚合本轮训练的模型
+        
+        # 聚合
+        global_node.round += 1
+        global_node.merge(will_merge_prompter_list,
+                          select_idx_list, subset_realidx_list, args)
+        
+        global_asrs = []
+        
+     
+        global_acc,global_asr = 0,0
+        for key in test_datas.keys():
+            g_poison_testdata,g_poison_test_labels = deepcopy(test_datas[key])
+            test_poison_dataset = New_Data.CustomDataset(g_poison_testdata,g_poison_test_labels)
+            test_poison_loader = DataLoader(test_poison_dataset,batch_size=batch_size,shuffle=False,num_workers=num_workers,pin_memory=True)
+            if key =='clean':
+                global_acc = validate(indices, test_poison_loader, model,
+                                global_node.prompter, global_node.criterion, global_node.args)
+            else:
+                # continue
+                global_asr = validate(indices, test_poison_loader, model,
+                                global_node.prompter, global_node.criterion, global_node.args)
+
+                print(f"Round {i+1}/{args.round} Global {key}, ASR: {global_asr:.2f}%")
+                global_asrs.append([key,global_asr])
+            # break
+        print('Round {}/{} Globalnode Acc is {:4.2f}'.format(i +
+            1, args.round, global_acc))
+        # 更新数据
+        global_node.acc = global_acc
+        global_node.asr = global_asr
+        # global_node.save_checkpoint()
+        if global_node.best_acc < global_acc:
+            # global_node.save_checkpoint(isbest=True)
+            global_node.best_acc = global_acc
+        t_save_data = {'node_id':'global_node','acc':global_acc,'asr':global_asrs,
+                       'round':i+1,'dict':global_node.prompter.state_dict(),'ispoison':None}
+        number_of_elements = len(save_data)
+        save_data[str(number_of_elements)] = deepcopy(t_save_data)
+        # print('Round {}/{} Globalnode Acc is {:4.2f} Asr is {:4.2f} '.format(i +
+        #       1, args.round, global_acc, global_asr))
+
+   
+    file_path = os.path.join(args.save_dir,'final.pth')
+    print(file_path)
+    torch.save(save_data,file_path)
+    
+    
+
     
     
 if __name__ == '__main__':
