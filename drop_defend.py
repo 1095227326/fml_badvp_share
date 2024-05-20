@@ -111,7 +111,7 @@ def parse_option():
     args.gpu = int(args.device[-1])
     
     
-    t_save_path = './save/drop_defend_no_random_{}_{}_{}_{}_{}_{}_{}'
+    t_save_path = './save/acc_drop_defend_no_random_{}_{}_{}_{}_{}_{}_{}'
     
     t_dataset = args.dataset
     
@@ -203,8 +203,8 @@ def inti_train_data(args):
             poison_flags.append('poison')
             random_pos = possiable_pos[poison_node_randomer.randint(0,7)]
             ranom_tar = poison_node_randomer.randint(0,has_class_nums-1)
-            poison_poss.append(random_pos)
-            poison_targets.append(ranom_tar)
+            poison_poss.append('br')
+            poison_targets.append(1)
         else:
             poison_flags.append('clean')
             poison_poss.append(-1)
@@ -404,7 +404,7 @@ def main(args):
             select_idx_list.append(node_id)
             will_merge_prompter_list.append(now_node.prompter)  # 还是只聚合本轮训练的模型
         
-        top_6_idx = sorted(range(len(t_acc_list)), key=lambda i: t_acc_list[i], reverse=True)[:6]
+        top_6_idx = sorted(range(len(t_acc_list)), key=lambda i: t_acc_list[i], reverse=True)[:7]
         will_merge_prompter_list = [will_merge_prompter_list[i] for i in top_6_idx]
         select_idx_list = [select_idx_list[i] for i in top_6_idx]
         print(select_idx_list)

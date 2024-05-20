@@ -14,8 +14,65 @@ import timm
 from models import prompters
 from Model import vit
 from torchvision.models.resnet import resnet50,ResNet50_Weights
+from scipy.spatial.distance import pdist, squareform
+from sklearn.cluster import AgglomerativeClustering
+
+
 choice_randomer = np.random.default_rng(seed=42)
 save_data = {}
+def state_dict2nparr(p):
+    numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
+    t_arr = []
+    for key, value in numpy_state_dict.items():
+        t_arr.append(value.flatten())
+        # print(f"Key: {key}, Shape: {value.flatten().shape}")
+    t_arr = np.concatenate(t_arr)
+   
+    print(len(t_arr))
+    return t_arr
+
+def detect_poison(stacked_arrays):
+    # p_arr = []
+    # for p in will_merge_prompter_list:
+       
+    #     t_arr = []
+    #     numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
+    #     for key, value in numpy_state_dict.items():
+    #         t_arr.append(value.flatten())
+    #         # print(f"Key: {key}, Shape: {value.flatten().shape}")
+    #     t_arr = np.concatenate(t_arr)
+    #     # print(t_arr.shape)
+    #     p_arr.append(t_arr)
+    # print(len(p_arr),p_arr[0].shape)
+    #     t_arr = []
+    #     numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
+    #     for key, value in numpy_state_dict.items():
+    #         t_arr.append(value.flatten())
+    #         # print(f"Key: {key}, Shape: {value.flatten().shape}")
+    #     t_arr = np.concatenate(t_arr)
+    #     # print(t_arr.shape)
+    #     p_arr.append(t_arr)
+    # print(len(p_arr),p_arr[0].shape)
+
+
+
+    # stacked_arrays = np.vstack(p_arr)
+
+    # 计算余弦距离矩阵
+    cosine_distances = squareform(pdist(stacked_arrays, metric='cosine')) * 100.0
+    clustering = AgglomerativeClustering(n_clusters=2, metric='precomputed', linkage='complete')
+    cluster_labels = clustering.fit_predict(cosine_distances)
+
+    # 输出聚类结果
+   
+    label_counts = np.bincount(cluster_labels)
+    majority_label = np.argmax(label_counts)
+    minority_label = 1 - majority_label
+
+    # 重置cluster_labels
+    new_cluster_labels = np.where(cluster_labels == majority_label, 0, 1)
+    print("Cluster labels:", new_cluster_labels)
+    return new_cluster_labels
 
 def parse_option():
     parser = argparse.ArgumentParser('N_main')
@@ -111,7 +168,7 @@ def parse_option():
     args.gpu = int(args.device[-1])
     
     
-    t_save_path = './save/pos_random_{}_{}_{}_{}_{}_{}_{}'
+    t_save_path = './save/cos_drop_defend_no_random_{}_{}_{}_{}_{}_{}_{}'
     
     t_dataset = args.dataset
     
@@ -203,7 +260,7 @@ def inti_train_data(args):
             poison_flags.append('poison')
             random_pos = possiable_pos[poison_node_randomer.randint(0,7)]
             ranom_tar = poison_node_randomer.randint(0,has_class_nums-1)
-            poison_poss.append(random_pos)
+            poison_poss.append('br')
             poison_targets.append(1)
         else:
             poison_flags.append('clean')
@@ -312,6 +369,7 @@ def main(args):
 
         will_merge_prompter_list = []
         select_idx_list = []  # 记录选的是哪几个客户端，因为客户端权重跟其样本数量有关
+        t_acc_list = []
         for node_id in select_idx:
             local_data,local_lables,local_tags = deepcopy(final_local_train_datas[node_id])
             # 初始化当前node
@@ -340,7 +398,7 @@ def main(args):
             global_prompter_current = deepcopy(now_node.prompter)
     
 
-            for now_epoch in range(args.epochs):
+            for now_epoch in range(1):
                 # 用于调整学习率
                 args.now_step = i*args.epochs + now_epoch
 
@@ -399,14 +457,27 @@ def main(args):
                 print(desc.format(i+1, args.round, node_id, acc, asr))            
         
             node_list[node_id] = now_node 
+            t_acc_list.append(acc)
             select_idx_list.append(node_id)
             will_merge_prompter_list.append(now_node.prompter)  # 还是只聚合本轮训练的模型
         
+        g_arr = state_dict2nparr(global_node.prompter.state_dict())
+        train_arr_list = [state_dict2nparr(t_p.state_dict())-g_arr for t_p in will_merge_prompter_list]
+        print(train_arr_list[0].shape)
+        flags = list(detect_poison(train_arr_list))
+
+        true_idx = []
+        for idxx , flag in enumerate(flags):
+            if flag == 0:   
+                true_idx.append(idxx)
+        # print(true_idx)
+        will_merge_prompter_list = [will_merge_prompter_list[i] for i in true_idx]
+        select_idx_list = [select_idx_list[i] for i in true_idx]
+        print(select_idx_list)
         # 聚合
         global_node.round += 1
         global_node.merge(will_merge_prompter_list,
                           select_idx_list, subset_realidx_list, args)
-        
         global_asrs = []
         
      
