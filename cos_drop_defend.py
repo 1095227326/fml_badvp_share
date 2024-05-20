@@ -44,6 +44,15 @@ def detect_poison(stacked_arrays):
     #     # print(t_arr.shape)
     #     p_arr.append(t_arr)
     # print(len(p_arr),p_arr[0].shape)
+    #     t_arr = []
+    #     numpy_state_dict = {k: v.cpu().numpy() for k, v in p.items()}
+    #     for key, value in numpy_state_dict.items():
+    #         t_arr.append(value.flatten())
+    #         # print(f"Key: {key}, Shape: {value.flatten().shape}")
+    #     t_arr = np.concatenate(t_arr)
+    #     # print(t_arr.shape)
+    #     p_arr.append(t_arr)
+    # print(len(p_arr),p_arr[0].shape)
 
 
 
@@ -55,8 +64,16 @@ def detect_poison(stacked_arrays):
     cluster_labels = clustering.fit_predict(cosine_distances)
 
     # 输出聚类结果
-    print("Cluster labels:", cluster_labels)
-    return cluster_labels
+   
+    label_counts = np.bincount(cluster_labels)
+    majority_label = np.argmax(label_counts)
+    minority_label = 1 - majority_label
+
+    # 重置cluster_labels
+    new_cluster_labels = np.where(cluster_labels == majority_label, 0, 1)
+    print("Cluster labels:", new_cluster_labels)
+    return new_cluster_labels
+
 def parse_option():
     parser = argparse.ArgumentParser('N_main')
     
@@ -452,8 +469,8 @@ def main(args):
         true_idx = []
         for idxx , flag in enumerate(flags):
             if flag == 0:   
-                true_idx.append(select_idx_list[idxx])
-        
+                true_idx.append(idxx)
+        # print(true_idx)
         will_merge_prompter_list = [will_merge_prompter_list[i] for i in true_idx]
         select_idx_list = [select_idx_list[i] for i in true_idx]
         print(select_idx_list)

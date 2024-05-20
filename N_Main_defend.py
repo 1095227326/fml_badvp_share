@@ -123,7 +123,7 @@ def state_dict2nparr(p):
     print(len(t_arr))
     return t_arr
 
-def detect_poison(p_arr):
+def detect_poison(stacked_arrays):
     # p_arr = []
     # for p in will_merge_prompter_list:
        

@@ -111,7 +111,7 @@ def parse_option():
     args.gpu = int(args.device[-1])
     
     
-    t_save_path = './save/no_random_{}_{}_{}_{}_{}_{}_{}'
+    t_save_path = './save/pos_random_{}_{}_{}_{}_{}_{}_{}'
     
     t_dataset = args.dataset
     
@@ -203,7 +203,7 @@ def inti_train_data(args):
             poison_flags.append('poison')
             random_pos = possiable_pos[poison_node_randomer.randint(0,7)]
             ranom_tar = poison_node_randomer.randint(0,has_class_nums-1)
-            poison_poss.append('br')
+            poison_poss.append(random_pos)
             poison_targets.append(1)
         else:
             poison_flags.append('clean')
