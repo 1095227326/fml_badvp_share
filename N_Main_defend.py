@@ -123,7 +123,7 @@ def state_dict2nparr(p):
     print(len(t_arr))
     return t_arr
 
-def detect_poison(p_arr):
+def detect_poison(stacked_arrays):
     # p_arr = []
     # for p in will_merge_prompter_list:
        
@@ -148,7 +148,6 @@ def detect_poison(p_arr):
 
 
 
-    # stacked_arrays = np.vstack(p_arr)
 
     # 计算余弦距离矩阵
     cosine_distances = squareform(pdist(stacked_arrays, metric='cosine')) * 100.0
